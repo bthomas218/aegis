@@ -5,6 +5,7 @@ import { PrismaService } from './prisma/prisma.service';
 import { ConfigModule } from '@nestjs/config';
 import { z } from 'zod';
 import { UsersModule } from './users/users.module';
+import { AuthModule } from './auth/auth.module';
 
 const envSchema = z.object({
   NODE_ENV: z
@@ -12,6 +13,7 @@ const envSchema = z.object({
     .default('development'),
   PORT: z.coerce.number().default(3000),
   DATABASE_URL: z.url(),
+  JWT_SECRET: z.string(),
 });
 
 function validate(config: Record<string, unknown>) {
@@ -32,6 +34,7 @@ function validate(config: Record<string, unknown>) {
       isGlobal: true,
     }),
     UsersModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],
