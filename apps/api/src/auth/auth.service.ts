@@ -18,9 +18,9 @@ export class AuthService {
     const { email, password } = credentials;
     const password_hash = await argon2.hash(password);
 
-    await this.users.create({ email, password_hash });
+    const user = await this.users.create({ email, password_hash });
 
-    return this.login({ email, password });
+    return { acess_token: await this.issueAcessToken(user) };
   }
 
   async login(credentials: CredentialsDTO) {
