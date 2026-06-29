@@ -4,6 +4,7 @@ import { AppService } from './app.service';
 import { PrismaService } from './prisma/prisma.service';
 import { ConfigModule } from '@nestjs/config';
 import { z } from 'zod';
+import { UsersModule } from './users/users.module';
 
 const envSchema = z.object({
   NODE_ENV: z
@@ -30,6 +31,7 @@ function validate(config: Record<string, unknown>) {
       validate,
       isGlobal: true,
     }),
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],
