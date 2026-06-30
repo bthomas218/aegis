@@ -5,6 +5,7 @@ import * as argon2 from 'argon2';
 import { CredentialsDTO } from './dto/credentials-dto';
 import { JwtService } from '@nestjs/jwt';
 import { User } from 'src/generated/prisma/client';
+import { RefreshTokensService } from './refresh-tokens/refresh-tokens.service';
 
 @Injectable()
 export class AuthService {
@@ -12,6 +13,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly users: UsersService,
     private readonly jwt: JwtService,
+    private readonly refreshTokens: RefreshTokensService,
   ) {}
 
   async register(credentials: CredentialsDTO) {
@@ -20,7 +22,10 @@ export class AuthService {
 
     const user = await this.users.create({ email, password_hash });
 
-    return { acess_token: await this.issueAcessToken(user) };
+    return {
+      acess_token: await this.issueAcessToken(user),
+      refresh_token: await this.refreshTokens.create(user.id),
+    };
   }
 
   async login(credentials: CredentialsDTO) {
@@ -38,7 +43,19 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    return { acess_token: await this.issueAcessToken(user) };
+    return {
+      acess_token: await this.issueAcessToken(user),
+      refresh_token: await this.refreshTokens.create(user.id),
+    };
+  }
+
+  async refresh(refreshToken: string) {
+    const payload = await this.refreshTokens.rotate(refreshToken);
+
+    return {
+      acess_token: await this.issueAcessToken(payload.user),
+      refresh_token: payload.newToken,
+    };
   }
 
   async issueAcessToken(user: User) {

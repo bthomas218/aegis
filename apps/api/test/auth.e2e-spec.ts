@@ -5,6 +5,7 @@ import request from 'supertest';
 import * as argon2 from 'argon2';
 import { AuthController } from '../src/auth/auth.controller';
 import { AuthService } from '../src/auth/auth.service';
+import { RefreshTokensService } from '../src/auth/refresh-tokens/refresh-tokens.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { UsersService } from '../src/users/users.service';
 
@@ -26,6 +27,10 @@ describe('AuthController (e2e)', () => {
   const jwtServiceMock = {
     signAsync: jest.fn(),
   };
+  const refreshTokensServiceMock = {
+    create: jest.fn(),
+    rotate: jest.fn(),
+  };
 
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -43,6 +48,10 @@ describe('AuthController (e2e)', () => {
         {
           provide: JwtService,
           useValue: jwtServiceMock,
+        },
+        {
+          provide: RefreshTokensService,
+          useValue: refreshTokensServiceMock,
         },
       ],
     }).compile();
@@ -78,6 +87,7 @@ describe('AuthController (e2e)', () => {
       email: credentials.email,
       password_hash: 'hashed-password',
     });
+    refreshTokensServiceMock.create.mockResolvedValue('refresh-token');
     usersServiceMock.findByEmail.mockResolvedValue({
       id: 'user-1',
       email: credentials.email,
@@ -88,11 +98,13 @@ describe('AuthController (e2e)', () => {
     ).mockResolvedValue(true);
     jwtServiceMock.signAsync.mockResolvedValue('signed-token');
 
-    await request(app.getHttpServer())
+    const server = app.getHttpServer() as Parameters<typeof request>[0];
+
+    await request(server)
       .post('/auth/register')
       .send(credentials)
       .expect(201)
-      .expect({ acess_token: 'signed-token' });
+      .expect({ acess_token: 'signed-token', refresh_token: 'refresh-token' });
   });
 
   it('logs in an existing user and returns an access token', async () => {
@@ -106,15 +118,40 @@ describe('AuthController (e2e)', () => {
       email: credentials.email,
       password_hash: 'hashed-password',
     });
+    refreshTokensServiceMock.create.mockResolvedValue('refresh-token');
     (
       argon2.verify as jest.MockedFunction<typeof argon2.verify>
     ).mockResolvedValue(true);
     jwtServiceMock.signAsync.mockResolvedValue('login-token');
 
-    await request(app.getHttpServer())
+    const server = app.getHttpServer() as Parameters<typeof request>[0];
+
+    await request(server)
       .post('/auth/login')
       .send(credentials)
       .expect(200)
-      .expect({ acess_token: 'login-token' });
+      .expect({ acess_token: 'login-token', refresh_token: 'refresh-token' });
+  });
+
+  it('refreshes a token pair and returns a new access and refresh token', async () => {
+    refreshTokensServiceMock.rotate.mockResolvedValue({
+      user: {
+        id: 'user-3',
+        email: 'refreshed@example.com',
+      },
+      newToken: 'new-refresh-token',
+    });
+    jwtServiceMock.signAsync.mockResolvedValue('refreshed-token');
+
+    const server = app.getHttpServer() as Parameters<typeof request>[0];
+
+    await request(server)
+      .post('/auth/refresh')
+      .send({ refreshToken: 'old-refresh-token' })
+      .expect(200)
+      .expect({
+        acess_token: 'refreshed-token',
+        refresh_token: 'new-refresh-token',
+      });
   });
 });

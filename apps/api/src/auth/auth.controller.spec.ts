@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { CredentialsDTO } from './dto/credentials-dto';
+import { RefreshDTO } from './dto/refresh-dto';
 
 jest.mock('./auth.service', () => ({
   AuthService: class AuthService {},
@@ -10,8 +11,18 @@ jest.mock('./auth.service', () => ({
 describe('AuthController', () => {
   let controller: AuthController;
   const authServiceMock = {
-    register: jest.fn<Promise<{ acess_token: string }>, [CredentialsDTO]>(),
-    login: jest.fn<Promise<{ acess_token: string }>, [CredentialsDTO]>(),
+    register: jest.fn<
+      Promise<{ acess_token: string; refresh_token: string }>,
+      [CredentialsDTO]
+    >(),
+    login: jest.fn<
+      Promise<{ acess_token: string; refresh_token: string }>,
+      [CredentialsDTO]
+    >(),
+    refresh: jest.fn<
+      Promise<{ acess_token: string; refresh_token: string }>,
+      [string]
+    >(),
   };
 
   beforeEach(async () => {
@@ -38,7 +49,10 @@ describe('AuthController', () => {
       email: 'test@example.com',
       password: 'password123',
     };
-    const response = { acess_token: 'registered-token' };
+    const response = {
+      acess_token: 'registered-token',
+      refresh_token: 'registered-refresh-token',
+    };
 
     authServiceMock.register.mockResolvedValue(response);
 
@@ -51,11 +65,29 @@ describe('AuthController', () => {
       email: 'test@example.com',
       password: 'password123',
     };
-    const response = { acess_token: 'login-token' };
+    const response = {
+      acess_token: 'login-token',
+      refresh_token: 'login-refresh-token',
+    };
 
     authServiceMock.login.mockResolvedValue(response);
 
     await expect(controller.login(credentials)).resolves.toEqual(response);
     expect(authServiceMock.login).toHaveBeenCalledWith(credentials);
+  });
+
+  it('refreshes a token pair by delegating to the auth service', async () => {
+    const refresh: RefreshDTO = {
+      refreshToken: 'old-refresh-token',
+    };
+    const response = {
+      acess_token: 'refreshed-token',
+      refresh_token: 'new-refresh-token',
+    };
+
+    authServiceMock.refresh.mockResolvedValue(response);
+
+    await expect(controller.refresh(refresh)).resolves.toEqual(response);
+    expect(authServiceMock.refresh).toHaveBeenCalledWith(refresh.refreshToken);
   });
 });

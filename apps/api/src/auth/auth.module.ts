@@ -6,17 +6,20 @@ import { UsersService } from 'src/users/users.service';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
+import { RefreshTokensService } from './refresh-tokens/refresh-tokens.service';
+
+const EXPIRY_MINUTES = 60;
 
 @Module({
   imports: [
     UsersModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: async (config: ConfigService) => ({
+      useFactory: (config: ConfigService) => ({
         secret: config.get<string>('JWT_SECRET'),
         signOptions: {
           issuer: 'aegis',
-          expiresIn: '60m',
+          expiresIn: `${EXPIRY_MINUTES}m`,
           audience: 'aegis-api',
         },
       }),
@@ -25,7 +28,7 @@ import { AuthController } from './auth.controller';
       global: true,
     }),
   ],
-  providers: [AuthService, PrismaService, UsersService],
+  providers: [AuthService, PrismaService, UsersService, RefreshTokensService],
   controllers: [AuthController],
 })
 export class AuthModule {}

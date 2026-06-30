@@ -11,29 +11,41 @@ import { RefreshTokensService } from './refresh-tokens.service';
 
 describe('RefreshTokensService', () => {
   let service: RefreshTokensService;
-  const prismaServiceMock = {
-    refreshToken: {
-      create: jest.fn(),
-      findUnique: jest.fn(),
-      updateMany: jest.fn(),
-    },
-    $transaction: jest.fn(),
-  };
 
-  let txMock: {
+  type TransactionMock = {
     refreshToken: {
-      findUnique: jest.Mock;
-      update: jest.Mock;
-      create: jest.Mock;
+      findUnique: jest.Mock<Promise<unknown>, [unknown]>;
+      update: jest.Mock<Promise<unknown>, [unknown]>;
+      create: jest.Mock<Promise<unknown>, [unknown]>;
     };
   };
+
+  type TransactionCallback = (tx: TransactionMock) => Promise<unknown>;
+
+  const prismaServiceMock: {
+    refreshToken: {
+      create: jest.Mock<Promise<unknown>, [unknown]>;
+      findUnique: jest.Mock<Promise<unknown>, [unknown]>;
+      updateMany: jest.Mock<Promise<unknown>, [unknown]>;
+    };
+    $transaction: jest.Mock<Promise<unknown>, [TransactionCallback]>;
+  } = {
+    refreshToken: {
+      create: jest.fn<Promise<unknown>, [unknown]>(),
+      findUnique: jest.fn<Promise<unknown>, [unknown]>(),
+      updateMany: jest.fn<Promise<unknown>, [unknown]>(),
+    },
+    $transaction: jest.fn<Promise<unknown>, [TransactionCallback]>(),
+  };
+
+  let txMock: TransactionMock;
 
   beforeEach(async () => {
     txMock = {
       refreshToken: {
-        findUnique: jest.fn(),
-        update: jest.fn(),
-        create: jest.fn(),
+        findUnique: jest.fn<Promise<unknown>, [unknown]>(),
+        update: jest.fn<Promise<unknown>, [unknown]>(),
+        create: jest.fn<Promise<unknown>, [unknown]>(),
       },
     };
 
@@ -42,8 +54,7 @@ describe('RefreshTokensService', () => {
     prismaServiceMock.refreshToken.updateMany.mockReset();
     prismaServiceMock.$transaction.mockReset();
     prismaServiceMock.$transaction.mockImplementation(
-      async (callback: (tx: typeof txMock) => Promise<unknown>) =>
-        callback(txMock),
+      async (callback: TransactionCallback) => callback(txMock),
     );
 
     const module: TestingModule = await Test.createTestingModule({
@@ -70,13 +81,19 @@ describe('RefreshTokensService', () => {
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
     expect(token).toEqual(expect.any(String));
-    expect(prismaServiceMock.refreshToken.create).toHaveBeenCalledWith({
+
+    const createArgs = prismaServiceMock.refreshToken.create.mock
+      .calls[0]?.[0] as {
       data: {
-        tokenHash,
-        userId: 'user-1',
-        expiresAt: expect.any(Date),
-      },
-    });
+        tokenHash: string;
+        userId: string;
+        expiresAt: Date;
+      };
+    };
+
+    expect(createArgs.data.tokenHash).toBe(tokenHash);
+    expect(createArgs.data.userId).toBe('user-1');
+    expect(createArgs.data.expiresAt).toBeInstanceOf(Date);
   });
 
   it('returns a refresh token record when validation succeeds', async () => {
@@ -137,15 +154,20 @@ describe('RefreshTokensService', () => {
 
     await service.revoke(token);
 
-    expect(prismaServiceMock.refreshToken.updateMany).toHaveBeenCalledWith({
+    const updateManyArgs = prismaServiceMock.refreshToken.updateMany.mock
+      .calls[0]?.[0] as {
       where: {
-        tokenHash,
-        revokedAt: null,
-      },
+        tokenHash: string;
+        revokedAt: null;
+      };
       data: {
-        revokedAt: expect.any(Date),
-      },
-    });
+        revokedAt: Date;
+      };
+    };
+
+    expect(updateManyArgs.where.tokenHash).toBe(tokenHash);
+    expect(updateManyArgs.where.revokedAt).toBeNull();
+    expect(updateManyArgs.data.revokedAt).toBeInstanceOf(Date);
   });
 
   it('rotates an active token by revoking it and creating a replacement', async () => {
@@ -167,33 +189,42 @@ describe('RefreshTokensService', () => {
     txMock.refreshToken.update.mockResolvedValue({});
     txMock.refreshToken.create.mockResolvedValue({});
 
-    await expect(service.rotate(token)).resolves.toEqual({
-      user: oldTokenRecord.user,
-      newToken: expect.any(String),
-    });
+    const result = await service.rotate(token);
 
-    expect(txMock.refreshToken.findUnique).toHaveBeenCalledWith({
-      where: { tokenHash },
-      include: { user: true },
+    expect(result).toMatchObject({
+      user: oldTokenRecord.user,
     });
-    expect(txMock.refreshToken.update).toHaveBeenCalledWith({
-      where: { tokenHash },
+    expect(typeof result.newToken).toBe('string');
+
+    const findUniqueArgs = txMock.refreshToken.findUnique.mock
+      .calls[0]?.[0] as {
+      where: { tokenHash: string };
+      include: { user: true };
+    };
+    expect(findUniqueArgs.where.tokenHash).toBe(tokenHash);
+    expect(findUniqueArgs.include).toEqual({ user: true });
+
+    const updateArgs = txMock.refreshToken.update.mock.calls[0]?.[0] as {
+      where: { tokenHash: string };
+      data: { revokedAt: Date };
+    };
+    expect(updateArgs.where.tokenHash).toBe(tokenHash);
+    expect(updateArgs.data.revokedAt).toBeInstanceOf(Date);
+
+    const createArgs = txMock.refreshToken.create.mock.calls[0]?.[0] as {
       data: {
-        revokedAt: expect.any(Date),
-      },
-    });
-    expect(txMock.refreshToken.create).toHaveBeenCalledWith({
-      data: {
-        tokenHash: expect.any(String),
-        expiresAt: expect.any(Date),
-        userId: 'user-1',
-      },
-    });
+        tokenHash: string;
+        expiresAt: Date;
+        userId: string;
+      };
+    };
+    expect(typeof createArgs.data.tokenHash).toBe('string');
+    expect(createArgs.data.expiresAt).toBeInstanceOf(Date);
+    expect(createArgs.data.userId).toBe('user-1');
   });
 
   it('rejects rotation when the token is invalid', async () => {
     const token = 'expired-token';
-    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
     txMock.refreshToken.findUnique.mockResolvedValue(null);
 

@@ -7,6 +7,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { UsersService } from 'src/users/users.service';
 import { AuthService } from './auth.service';
 import { CredentialsDTO } from './dto/credentials-dto';
+import { RefreshTokensService } from './refresh-tokens/refresh-tokens.service';
 
 jest.mock('src/prisma/prisma.service', () => ({
   PrismaService: class PrismaService {},
@@ -26,6 +27,10 @@ describe('AuthService', () => {
   const jwtServiceMock = {
     signAsync: jest.fn(),
   };
+  const refreshTokensServiceMock = {
+    create: jest.fn(),
+    rotate: jest.fn(),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -42,6 +47,10 @@ describe('AuthService', () => {
         {
           provide: JwtService,
           useValue: jwtServiceMock,
+        },
+        {
+          provide: RefreshTokensService,
+          useValue: refreshTokensServiceMock,
         },
       ],
     }).compile();
@@ -70,9 +79,11 @@ describe('AuthService', () => {
       argon2.verify as jest.MockedFunction<typeof argon2.verify>
     ).mockResolvedValue(true);
     jwtServiceMock.signAsync.mockResolvedValue('signed-token');
+    refreshTokensServiceMock.create.mockResolvedValue('refresh-token');
 
     await expect(service.login(credentials)).resolves.toEqual({
       acess_token: 'signed-token',
+      refresh_token: 'refresh-token',
     });
 
     expect(usersServiceMock.findByEmail).toHaveBeenCalledWith(
@@ -86,6 +97,7 @@ describe('AuthService', () => {
       sub: 'aegis_user-1',
       email: credentials.email,
     });
+    expect(refreshTokensServiceMock.create).toHaveBeenCalledWith('user-1');
   });
 
   it('throws UnauthorizedException when the user cannot be found', async () => {
@@ -148,15 +160,44 @@ describe('AuthService', () => {
       argon2.verify as jest.MockedFunction<typeof argon2.verify>
     ).mockResolvedValue(true);
     jwtServiceMock.signAsync.mockResolvedValue('signed-token');
+    refreshTokensServiceMock.create.mockResolvedValue('refresh-token');
 
     await expect(service.register(credentials)).resolves.toEqual({
       acess_token: 'signed-token',
+      refresh_token: 'refresh-token',
     });
 
     expect(argon2.hash).toHaveBeenCalledWith(credentials.password);
     expect(usersServiceMock.create).toHaveBeenCalledWith({
       email: credentials.email,
       password_hash: 'hashed-password',
+    });
+    expect(refreshTokensServiceMock.create).toHaveBeenCalledWith('user-2');
+  });
+
+  it('rotates a refresh token and returns a new access and refresh token', async () => {
+    const user = {
+      id: 'user-3',
+      email: 'rotated@example.com',
+    } as User;
+
+    refreshTokensServiceMock.rotate.mockResolvedValue({
+      user,
+      newToken: 'new-refresh-token',
+    });
+    jwtServiceMock.signAsync.mockResolvedValue('rotated-token');
+
+    await expect(service.refresh('old-refresh-token')).resolves.toEqual({
+      acess_token: 'rotated-token',
+      refresh_token: 'new-refresh-token',
+    });
+
+    expect(refreshTokensServiceMock.rotate).toHaveBeenCalledWith(
+      'old-refresh-token',
+    );
+    expect(jwtServiceMock.signAsync).toHaveBeenCalledWith({
+      sub: 'aegis_user-3',
+      email: 'rotated@example.com',
     });
   });
 });
