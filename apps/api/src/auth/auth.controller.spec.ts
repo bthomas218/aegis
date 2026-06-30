@@ -12,15 +12,15 @@ describe('AuthController', () => {
   let controller: AuthController;
   const authServiceMock = {
     register: jest.fn<
-      Promise<{ acess_token: string; refresh_token: string }>,
+      Promise<{ accessToken: string; refreshToken: string }>,
       [CredentialsDTO]
     >(),
     login: jest.fn<
-      Promise<{ acess_token: string; refresh_token: string }>,
+      Promise<{ accessToken: string; refreshToken: string }>,
       [CredentialsDTO]
     >(),
     refresh: jest.fn<
-      Promise<{ acess_token: string; refresh_token: string }>,
+      Promise<{ accessToken: string; refreshToken: string }>,
       [string]
     >(),
   };
@@ -50,8 +50,8 @@ describe('AuthController', () => {
       password: 'password123',
     };
     const response = {
-      acess_token: 'registered-token',
-      refresh_token: 'registered-refresh-token',
+      accessToken: 'registered-token',
+      refreshToken: 'registered-refresh-token',
     };
 
     authServiceMock.register.mockResolvedValue(response);
@@ -66,8 +66,8 @@ describe('AuthController', () => {
       password: 'password123',
     };
     const response = {
-      acess_token: 'login-token',
-      refresh_token: 'login-refresh-token',
+      accessToken: 'login-token',
+      refreshToken: 'login-refresh-token',
     };
 
     authServiceMock.login.mockResolvedValue(response);
@@ -81,8 +81,8 @@ describe('AuthController', () => {
       refreshToken: 'old-refresh-token',
     };
     const response = {
-      acess_token: 'refreshed-token',
-      refresh_token: 'new-refresh-token',
+      accessToken: 'refreshed-token',
+      refreshToken: 'new-refresh-token',
     };
 
     authServiceMock.refresh.mockResolvedValue(response);

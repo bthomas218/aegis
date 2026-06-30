@@ -82,8 +82,8 @@ describe('AuthService', () => {
     refreshTokensServiceMock.create.mockResolvedValue('refresh-token');
 
     await expect(service.login(credentials)).resolves.toEqual({
-      acess_token: 'signed-token',
-      refresh_token: 'refresh-token',
+      accessToken: 'signed-token',
+      refreshToken: 'refresh-token',
     });
 
     expect(usersServiceMock.findByEmail).toHaveBeenCalledWith(
@@ -163,8 +163,8 @@ describe('AuthService', () => {
     refreshTokensServiceMock.create.mockResolvedValue('refresh-token');
 
     await expect(service.register(credentials)).resolves.toEqual({
-      acess_token: 'signed-token',
-      refresh_token: 'refresh-token',
+      accessToken: 'signed-token',
+      refreshToken: 'refresh-token',
     });
 
     expect(argon2.hash).toHaveBeenCalledWith(credentials.password);
@@ -188,8 +188,8 @@ describe('AuthService', () => {
     jwtServiceMock.signAsync.mockResolvedValue('rotated-token');
 
     await expect(service.refresh('old-refresh-token')).resolves.toEqual({
-      acess_token: 'rotated-token',
-      refresh_token: 'new-refresh-token',
+      accessToken: 'rotated-token',
+      refreshToken: 'new-refresh-token',
     });
 
     expect(refreshTokensServiceMock.rotate).toHaveBeenCalledWith(

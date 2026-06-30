@@ -23,8 +23,8 @@ export class AuthService {
     const user = await this.users.create({ email, password_hash });
 
     return {
-      acess_token: await this.issueAcessToken(user),
-      refresh_token: await this.refreshTokens.create(user.id),
+      accessToken: await this.issueAccessToken(user),
+      refreshToken: await this.refreshTokens.create(user.id),
     };
   }
 
@@ -44,8 +44,8 @@ export class AuthService {
     }
 
     return {
-      acess_token: await this.issueAcessToken(user),
-      refresh_token: await this.refreshTokens.create(user.id),
+      accessToken: await this.issueAccessToken(user),
+      refreshToken: await this.refreshTokens.create(user.id),
     };
   }
 
@@ -53,12 +53,12 @@ export class AuthService {
     const payload = await this.refreshTokens.rotate(refreshToken);
 
     return {
-      acess_token: await this.issueAcessToken(payload.user),
-      refresh_token: payload.newToken,
+      accessToken: await this.issueAccessToken(payload.user),
+      refreshToken: payload.newToken,
     };
   }
 
-  async issueAcessToken(user: User) {
+  async issueAccessToken(user: User) {
     const { id, email } = user;
     const payload = {
       sub: `aegis_${id}`,

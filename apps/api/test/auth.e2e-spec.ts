@@ -104,7 +104,7 @@ describe('AuthController (e2e)', () => {
       .post('/auth/register')
       .send(credentials)
       .expect(201)
-      .expect({ acess_token: 'signed-token', refresh_token: 'refresh-token' });
+      .expect({ accessToken: 'signed-token', refreshToken: 'refresh-token' });
   });
 
   it('logs in an existing user and returns an access token', async () => {
@@ -130,7 +130,7 @@ describe('AuthController (e2e)', () => {
       .post('/auth/login')
       .send(credentials)
       .expect(200)
-      .expect({ acess_token: 'login-token', refresh_token: 'refresh-token' });
+      .expect({ accessToken: 'login-token', refreshToken: 'refresh-token' });
   });
 
   it('refreshes a token pair and returns a new access and refresh token', async () => {
@@ -150,8 +150,8 @@ describe('AuthController (e2e)', () => {
       .send({ refreshToken: 'old-refresh-token' })
       .expect(200)
       .expect({
-        acess_token: 'refreshed-token',
-        refresh_token: 'new-refresh-token',
+        accessToken: 'refreshed-token',
+        refreshToken: 'new-refresh-token',
       });
   });
 });
