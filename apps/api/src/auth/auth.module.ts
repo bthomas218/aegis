@@ -8,7 +8,9 @@ import { AuthController } from './auth.controller';
 import { RefreshTokensService } from './refresh-tokens/refresh-tokens.service';
 import { PassportModule } from '@nestjs/passport';
 import { LocalStrategy } from './strategies/local.strategy';
-import { LocalAuthGuard } from './guards/local-auth.gaurd';
+import { LocalAuthGuard } from './guards/local-auth.guard';
+import { JwtStrategy } from './strategies/jwt.strategy';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 const EXPIRY_MINUTES = 60;
 
@@ -37,7 +39,10 @@ const EXPIRY_MINUTES = 60;
     RefreshTokensService,
     LocalStrategy,
     LocalAuthGuard,
+    JwtStrategy,
+    JwtAuthGuard,
   ],
   controllers: [AuthController],
+  exports: [JwtAuthGuard],
 })
 export class AuthModule {}

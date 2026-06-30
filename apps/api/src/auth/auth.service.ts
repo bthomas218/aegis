@@ -70,7 +70,7 @@ export class AuthService {
   async issueAccessToken(user: User) {
     const { id, email, role } = user;
     const payload: JwtPayload = {
-      sub: `aegis_${id}`,
+      sub: `aegis|${id}`,
       email,
       role,
     };

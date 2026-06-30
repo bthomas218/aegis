@@ -1,5 +1,5 @@
 import { User } from 'src/generated/prisma/client';
 
-export type LoginRequest = Request & {
+export type AuthenticatedRequest = Request & {
   user: User;
 };

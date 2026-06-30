@@ -81,7 +81,7 @@ describe('AuthService', () => {
     });
 
     expect(jwtServiceMock.signAsync).toHaveBeenCalledWith({
-      sub: 'aegis_user-1',
+      sub: 'aegis|user-1',
       email: user.email,
       role: userRole,
     });
@@ -200,7 +200,7 @@ describe('AuthService', () => {
       'old-refresh-token',
     );
     expect(jwtServiceMock.signAsync).toHaveBeenCalledWith({
-      sub: 'aegis_user-3',
+      sub: 'aegis|user-3',
       email: 'rotated@example.com',
       role: userRole,
     });

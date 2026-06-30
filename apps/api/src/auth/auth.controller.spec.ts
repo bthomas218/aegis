@@ -4,7 +4,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { CredentialsDTO } from './dto/credentials-dto';
 import { RefreshDTO } from './dto/refresh-dto';
-import type { LoginRequest } from './types/login-request.type';
+import type { AuthenticatedRequest } from './types/authenticated-request.type';
 
 jest.mock('./auth.service', () => ({
   AuthService: class AuthService {},
@@ -71,7 +71,7 @@ describe('AuthController', () => {
       password_hash: 'hashed-password',
       role: userRole,
     } as User;
-    const req = { user } as LoginRequest;
+    const req = { user } as AuthenticatedRequest;
     const response = {
       accessToken: 'login-token',
       refreshToken: 'login-refresh-token',

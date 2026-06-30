@@ -10,8 +10,8 @@ import {
 import { AuthService } from './auth.service';
 import { CredentialsDTO } from './dto/credentials-dto';
 import { RefreshDTO } from './dto/refresh-dto';
-import { LocalAuthGuard } from './guards/local-auth.gaurd';
-import type { LoginRequest } from './types/login-request.type';
+import { LocalAuthGuard } from './guards/local-auth.guard';
+import type { AuthenticatedRequest } from './types/authenticated-request.type';
 
 @Controller('auth')
 export class AuthController {
@@ -26,7 +26,7 @@ export class AuthController {
   @UseGuards(LocalAuthGuard)
   @HttpCode(HttpStatus.OK)
   @Post('login')
-  async login(@Req() req: LoginRequest) {
+  async login(@Req() req: AuthenticatedRequest) {
     return await this.auth.login(req.user);
   }
 
