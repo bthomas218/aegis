@@ -1,8 +1,7 @@
-import { UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as argon2 from 'argon2';
-import { User } from 'src/generated/prisma/client';
+import type { User } from 'src/generated/prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { UsersService } from 'src/users/users.service';
 import { AuthService } from './auth.service';
@@ -19,6 +18,7 @@ jest.mock('argon2', () => ({
 }));
 
 describe('AuthService', () => {
+  const userRole = 'USER';
   let service: AuthService;
   const usersServiceMock = {
     create: jest.fn(),
@@ -64,7 +64,31 @@ describe('AuthService', () => {
     expect(service).toBeDefined();
   });
 
-  it('logs in a user and returns an access token when credentials are valid', async () => {
+  it('logs in a validated user and returns an access token', async () => {
+    const user = {
+      id: 'user-1',
+      email: 'test@example.com',
+      password_hash: 'hashed-password',
+      role: userRole,
+    } as User;
+
+    jwtServiceMock.signAsync.mockResolvedValue('signed-token');
+    refreshTokensServiceMock.create.mockResolvedValue('refresh-token');
+
+    await expect(service.login(user)).resolves.toEqual({
+      accessToken: 'signed-token',
+      refreshToken: 'refresh-token',
+    });
+
+    expect(jwtServiceMock.signAsync).toHaveBeenCalledWith({
+      sub: 'aegis_user-1',
+      email: user.email,
+      role: userRole,
+    });
+    expect(refreshTokensServiceMock.create).toHaveBeenCalledWith('user-1');
+  });
+
+  it('validates a user when credentials are valid', async () => {
     const credentials: CredentialsDTO = {
       email: 'test@example.com',
       password: 'password123',
@@ -73,20 +97,15 @@ describe('AuthService', () => {
       id: 'user-1',
       email: credentials.email,
       password_hash: 'hashed-password',
+      role: userRole,
     } as User;
 
     usersServiceMock.findByEmail.mockResolvedValue(user);
     (
       argon2.verify as jest.MockedFunction<typeof argon2.verify>
     ).mockResolvedValue(true);
-    jwtServiceMock.signAsync.mockResolvedValue('signed-token');
-    refreshTokensServiceMock.create.mockResolvedValue('refresh-token');
 
-    await expect(service.login(credentials)).resolves.toEqual({
-      accessToken: 'signed-token',
-      refreshToken: 'refresh-token',
-    });
-
+    await expect(service.validateUser(credentials)).resolves.toEqual(user);
     expect(usersServiceMock.findByEmail).toHaveBeenCalledWith(
       credentials.email,
     );
@@ -94,14 +113,9 @@ describe('AuthService', () => {
       user.password_hash,
       credentials.password,
     );
-    expect(jwtServiceMock.signAsync).toHaveBeenCalledWith({
-      sub: 'aegis_user-1',
-      email: credentials.email,
-    });
-    expect(refreshTokensServiceMock.create).toHaveBeenCalledWith('user-1');
   });
 
-  it('throws UnauthorizedException when the user cannot be found', async () => {
+  it('returns null when validating credentials for a missing user', async () => {
     const credentials: CredentialsDTO = {
       email: 'missing@example.com',
       password: 'password123',
@@ -109,15 +123,10 @@ describe('AuthService', () => {
 
     usersServiceMock.findByEmail.mockResolvedValue(null);
 
-    await expect(service.login(credentials)).rejects.toThrow(
-      UnauthorizedException,
-    );
-    await expect(service.login(credentials)).rejects.toThrow(
-      'Invalid email or password',
-    );
+    await expect(service.validateUser(credentials)).resolves.toBeNull();
   });
 
-  it('throws UnauthorizedException when the password is invalid', async () => {
+  it('returns null when validating credentials with an invalid password', async () => {
     const credentials: CredentialsDTO = {
       email: 'test@example.com',
       password: 'wrong-password',
@@ -126,6 +135,7 @@ describe('AuthService', () => {
       id: 'user-1',
       email: credentials.email,
       password_hash: 'hashed-password',
+      role: userRole,
     } as User;
 
     usersServiceMock.findByEmail.mockResolvedValue(user);
@@ -133,12 +143,7 @@ describe('AuthService', () => {
       argon2.verify as jest.MockedFunction<typeof argon2.verify>
     ).mockResolvedValue(false);
 
-    await expect(service.login(credentials)).rejects.toThrow(
-      UnauthorizedException,
-    );
-    await expect(service.login(credentials)).rejects.toThrow(
-      'Invalid email or password',
-    );
+    await expect(service.validateUser(credentials)).resolves.toBeNull();
   });
 
   it('registers a user by hashing the password and logging them in', async () => {
@@ -150,16 +155,13 @@ describe('AuthService', () => {
       id: 'user-2',
       email: credentials.email,
       password_hash: 'hashed-password',
+      role: userRole,
     } as User;
 
     (argon2.hash as jest.MockedFunction<typeof argon2.hash>).mockResolvedValue(
       'hashed-password',
     );
     usersServiceMock.create.mockResolvedValue(createdUser);
-    usersServiceMock.findByEmail.mockResolvedValue(createdUser);
-    (
-      argon2.verify as jest.MockedFunction<typeof argon2.verify>
-    ).mockResolvedValue(true);
     jwtServiceMock.signAsync.mockResolvedValue('signed-token');
     refreshTokensServiceMock.create.mockResolvedValue('refresh-token');
 
@@ -180,6 +182,7 @@ describe('AuthService', () => {
     const user = {
       id: 'user-3',
       email: 'rotated@example.com',
+      role: userRole,
     } as User;
 
     refreshTokensServiceMock.rotate.mockResolvedValue({
@@ -199,6 +202,7 @@ describe('AuthService', () => {
     expect(jwtServiceMock.signAsync).toHaveBeenCalledWith({
       sub: 'aegis_user-3',
       email: 'rotated@example.com',
+      role: userRole,
     });
   });
 

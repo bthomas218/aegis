@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { UsersService } from 'src/users/users.service';
 import * as argon2 from 'argon2';
@@ -29,25 +29,29 @@ export class AuthService {
     };
   }
 
-  async login(credentials: CredentialsDTO) {
+  async login(user: User) {
+    return {
+      accessToken: await this.issueAccessToken(user),
+      refreshToken: await this.refreshTokens.create(user.id),
+    };
+  }
+
+  async validateUser(credentials: CredentialsDTO) {
     const { email, password } = credentials;
 
     const user = await this.users.findByEmail(email);
 
     if (!user || !user.password_hash) {
-      throw new UnauthorizedException('Invalid email or password');
+      return null;
     }
 
     const valid = await argon2.verify(user.password_hash, password);
 
     if (!valid) {
-      throw new UnauthorizedException('Invalid email or password');
+      return null;
     }
 
-    return {
-      accessToken: await this.issueAccessToken(user),
-      refreshToken: await this.refreshTokens.create(user.id),
-    };
+    return user;
   }
 
   async refresh(refreshToken: string) {

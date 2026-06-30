@@ -1,7 +1,17 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { CredentialsDTO } from './dto/credentials-dto';
 import { RefreshDTO } from './dto/refresh-dto';
+import { LocalAuthGuard } from './guards/local-auth.gaurd';
+import type { LoginRequest } from './types/login-request.type';
 
 @Controller('auth')
 export class AuthController {
@@ -13,10 +23,11 @@ export class AuthController {
     return await this.auth.register(credentials);
   }
 
+  @UseGuards(LocalAuthGuard)
   @HttpCode(HttpStatus.OK)
   @Post('login')
-  async login(@Body() credentials: CredentialsDTO) {
-    return await this.auth.login(credentials);
+  async login(@Req() req: LoginRequest) {
+    return await this.auth.login(req.user);
   }
 
   @HttpCode(HttpStatus.OK)

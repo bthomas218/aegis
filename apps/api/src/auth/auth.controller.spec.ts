@@ -1,14 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import type { User } from 'src/generated/prisma/client';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { CredentialsDTO } from './dto/credentials-dto';
 import { RefreshDTO } from './dto/refresh-dto';
+import type { LoginRequest } from './types/login-request.type';
 
 jest.mock('./auth.service', () => ({
   AuthService: class AuthService {},
 }));
 
 describe('AuthController', () => {
+  const userRole = 'USER';
   let controller: AuthController;
   const authServiceMock = {
     register: jest.fn<
@@ -17,7 +20,7 @@ describe('AuthController', () => {
     >(),
     login: jest.fn<
       Promise<{ accessToken: string; refreshToken: string }>,
-      [CredentialsDTO]
+      [User]
     >(),
     refresh: jest.fn<
       Promise<{ accessToken: string; refreshToken: string }>,
@@ -62,10 +65,13 @@ describe('AuthController', () => {
   });
 
   it('logs in a user by delegating to the auth service', async () => {
-    const credentials: CredentialsDTO = {
+    const user = {
+      id: 'user-1',
       email: 'test@example.com',
-      password: 'password123',
-    };
+      password_hash: 'hashed-password',
+      role: userRole,
+    } as User;
+    const req = { user } as LoginRequest;
     const response = {
       accessToken: 'login-token',
       refreshToken: 'login-refresh-token',
@@ -73,8 +79,8 @@ describe('AuthController', () => {
 
     authServiceMock.login.mockResolvedValue(response);
 
-    await expect(controller.login(credentials)).resolves.toEqual(response);
-    expect(authServiceMock.login).toHaveBeenCalledWith(credentials);
+    await expect(controller.login(req)).resolves.toEqual(response);
+    expect(authServiceMock.login).toHaveBeenCalledWith(user);
   });
 
   it('refreshes a token pair by delegating to the auth service', async () => {

@@ -1,11 +1,13 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
-import request from 'supertest';
+import { PassportModule } from '@nestjs/passport';
+import { Test, TestingModule } from '@nestjs/testing';
 import * as argon2 from 'argon2';
+import request from 'supertest';
 import { AuthController } from '../src/auth/auth.controller';
 import { AuthService } from '../src/auth/auth.service';
 import { RefreshTokensService } from '../src/auth/refresh-tokens/refresh-tokens.service';
+import { LocalStrategy } from '../src/auth/strategies/local.strategy';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { UsersService } from '../src/users/users.service';
 
@@ -19,6 +21,7 @@ jest.mock('argon2', () => ({
 }));
 
 describe('AuthController (e2e)', () => {
+  const userRole = 'USER';
   let app: INestApplication;
   const usersServiceMock = {
     create: jest.fn(),
@@ -35,9 +38,11 @@ describe('AuthController (e2e)', () => {
 
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [PassportModule],
       controllers: [AuthController],
       providers: [
         AuthService,
+        LocalStrategy,
         {
           provide: PrismaService,
           useValue: {},
@@ -87,16 +92,9 @@ describe('AuthController (e2e)', () => {
       id: 'user-1',
       email: credentials.email,
       password_hash: 'hashed-password',
+      role: userRole,
     });
     refreshTokensServiceMock.create.mockResolvedValue('refresh-token');
-    usersServiceMock.findByEmail.mockResolvedValue({
-      id: 'user-1',
-      email: credentials.email,
-      password_hash: 'hashed-password',
-    });
-    (
-      argon2.verify as jest.MockedFunction<typeof argon2.verify>
-    ).mockResolvedValue(true);
     jwtServiceMock.signAsync.mockResolvedValue('signed-token');
 
     const server = app.getHttpServer() as Parameters<typeof request>[0];
@@ -118,6 +116,7 @@ describe('AuthController (e2e)', () => {
       id: 'user-2',
       email: credentials.email,
       password_hash: 'hashed-password',
+      role: userRole,
     });
     refreshTokensServiceMock.create.mockResolvedValue('refresh-token');
     (
@@ -139,6 +138,7 @@ describe('AuthController (e2e)', () => {
       user: {
         id: 'user-3',
         email: 'refreshed@example.com',
+        role: userRole,
       },
       newToken: 'new-refresh-token',
     });
