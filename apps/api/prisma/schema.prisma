@@ -18,13 +18,21 @@ model User {
 
   email String @unique
   password_hash String?
+  role UserRoles @default(USER)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt()
 
+
   refreshTokens RefreshToken[]
 
   @@map("users")
+}
+
+enum UserRoles {
+  USER
+  ADMIN
+  SYSTEM_ADMIN
 }
 
 model RefreshToken {

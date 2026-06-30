@@ -6,6 +6,7 @@ import { CredentialsDTO } from './dto/credentials-dto';
 import { JwtService } from '@nestjs/jwt';
 import { User } from 'src/generated/prisma/client';
 import { RefreshTokensService } from './refresh-tokens/refresh-tokens.service';
+import { JwtPayload } from './types/jwt-payload.type';
 
 @Injectable()
 export class AuthService {
@@ -63,10 +64,11 @@ export class AuthService {
   }
 
   async issueAccessToken(user: User) {
-    const { id, email } = user;
-    const payload = {
+    const { id, email, role } = user;
+    const payload: JwtPayload = {
       sub: `aegis_${id}`,
       email,
+      role,
     };
 
     return await this.jwt.signAsync(payload);
