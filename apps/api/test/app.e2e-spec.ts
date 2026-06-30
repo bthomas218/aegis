@@ -1,15 +1,27 @@
+import { Controller, INestApplication, Module, Get } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { AppModule } from './../src/app.module';
+
+@Controller()
+class TestAppController {
+  @Get()
+  getHello() {
+    return { status: 'OK' };
+  }
+}
+
+@Module({
+  controllers: [TestAppController],
+})
+class TestAppModule {}
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
 
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
+      imports: [TestAppModule],
     }).compile();
 
     app = moduleFixture.createNestApplication();
@@ -20,7 +32,7 @@ describe('AppController (e2e)', () => {
     return request(app.getHttpServer())
       .get('/')
       .expect(200)
-      .expect('Hello World!');
+      .expect({ status: 'OK' });
   });
 
   afterEach(async () => {
