@@ -58,6 +58,10 @@ export class AuthService {
     };
   }
 
+  async logout(refreshToken: string) {
+    await this.refreshTokens.revoke(refreshToken);
+  }
+
   async issueAccessToken(user: User) {
     const { id, email } = user;
     const payload = {

@@ -30,6 +30,7 @@ describe('AuthController (e2e)', () => {
   const refreshTokensServiceMock = {
     create: jest.fn(),
     rotate: jest.fn(),
+    revoke: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -153,5 +154,21 @@ describe('AuthController (e2e)', () => {
         accessToken: 'refreshed-token',
         refreshToken: 'new-refresh-token',
       });
+  });
+
+  it('logs out by revoking the refresh token and returning no content', async () => {
+    refreshTokensServiceMock.revoke.mockResolvedValue(undefined);
+
+    const server = app.getHttpServer() as Parameters<typeof request>[0];
+
+    await request(server)
+      .post('/auth/logout')
+      .send({ refreshToken: 'refresh-token' })
+      .expect(204)
+      .expect('');
+
+    expect(refreshTokensServiceMock.revoke).toHaveBeenCalledWith(
+      'refresh-token',
+    );
   });
 });

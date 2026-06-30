@@ -23,6 +23,7 @@ describe('AuthController', () => {
       Promise<{ accessToken: string; refreshToken: string }>,
       [string]
     >(),
+    logout: jest.fn<Promise<void>, [string]>(),
   };
 
   beforeEach(async () => {
@@ -89,5 +90,16 @@ describe('AuthController', () => {
 
     await expect(controller.refresh(refresh)).resolves.toEqual(response);
     expect(authServiceMock.refresh).toHaveBeenCalledWith(refresh.refreshToken);
+  });
+
+  it('logs out by delegating to the auth service', async () => {
+    const refresh: RefreshDTO = {
+      refreshToken: 'refresh-token',
+    };
+
+    authServiceMock.logout.mockResolvedValue(undefined);
+
+    await expect(controller.logout(refresh)).resolves.toBeUndefined();
+    expect(authServiceMock.logout).toHaveBeenCalledWith(refresh.refreshToken);
   });
 });
