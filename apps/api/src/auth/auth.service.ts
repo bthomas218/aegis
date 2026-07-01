@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { UsersService } from 'src/users/users.service';
 import * as argon2 from 'argon2';
@@ -7,6 +11,9 @@ import { JwtService } from '@nestjs/jwt';
 import { User } from 'src/generated/prisma/client';
 import { RefreshTokensService } from './refresh-tokens/refresh-tokens.service';
 import { JwtPayload } from './types/jwt-payload.type';
+import { ResetTokensService } from './reset-tokens/reset-tokens.service';
+import { SessionsService } from 'src/sessions/sessions.service';
+import { PasswordResetLinkService } from './password-reset-link.service';
 
 @Injectable()
 export class AuthService {
@@ -15,6 +22,9 @@ export class AuthService {
     private readonly users: UsersService,
     private readonly jwt: JwtService,
     private readonly refreshTokens: RefreshTokensService,
+    private readonly resetTokens: ResetTokensService,
+    private readonly sessions: SessionsService,
+    private readonly passwordResetLinks: PasswordResetLinkService,
   ) {}
 
   async register(
@@ -90,11 +100,59 @@ export class AuthService {
   }
 
   async forgotPassword(email: string) {
-    //TODO: Implement forgot password functionality
+    try {
+      const user = await this.users.findByEmail(email);
+
+      if (!user) {
+        return;
+      }
+
+      const token = await this.resetTokens.create(user.id);
+
+      await this.passwordResetLinks.send(user.email, token);
+    } catch (err) {
+      if (err instanceof NotFoundException) {
+        return;
+      }
+
+      throw err;
+    }
   }
 
   async resetPassword(token: string, newPassword: string) {
-    //TODO: Implement reset password functionality
+    const resetToken = await this.resetTokens.find(token);
+
+    if (
+      !resetToken ||
+      resetToken.usedAt !== null ||
+      resetToken.expiresAt <= new Date()
+    ) {
+      throw new BadRequestException('Invalid password reset token');
+    }
+
+    const password_hash = await argon2.hash(newPassword);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: {
+          id: resetToken.userId,
+        },
+        data: {
+          password_hash,
+        },
+      });
+
+      await tx.passwordResetToken.update({
+        where: {
+          id: resetToken.id,
+        },
+        data: {
+          usedAt: new Date(),
+        },
+      });
+    });
+
+    await this.sessions.revokeAll(resetToken.userId);
   }
 
   async issueAccessToken(user: Omit<User, 'password_hash'>) {

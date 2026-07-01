@@ -28,6 +28,8 @@ describe('AuthController', () => {
       [string]
     >(),
     logout: jest.fn<Promise<void>, [string]>(),
+    forgotPassword: jest.fn<Promise<void>, [string]>(),
+    resetPassword: jest.fn<Promise<void>, [string, string]>(),
   };
 
   beforeEach(async () => {
@@ -136,5 +138,33 @@ describe('AuthController', () => {
 
     await expect(controller.logout(refresh)).resolves.toBeUndefined();
     expect(authServiceMock.logout).toHaveBeenCalledWith(refresh.refreshToken);
+  });
+
+  it('returns a generic response for forgot password requests', async () => {
+    authServiceMock.forgotPassword.mockResolvedValue(undefined);
+
+    await expect(
+      controller.forgotPassword({ email: 'reset@example.com' }),
+    ).resolves.toEqual({
+      message: 'If an account exists, a password reset link will be sent.',
+    });
+    expect(authServiceMock.forgotPassword).toHaveBeenCalledWith(
+      'reset@example.com',
+    );
+  });
+
+  it('resets a password by delegating to the auth service', async () => {
+    authServiceMock.resetPassword.mockResolvedValue(undefined);
+
+    await expect(
+      controller.resetPassword({
+        token: 'opaque-token',
+        newPassword: 'new-password',
+      }),
+    ).resolves.toBeUndefined();
+    expect(authServiceMock.resetPassword).toHaveBeenCalledWith(
+      'opaque-token',
+      'new-password',
+    );
   });
 });

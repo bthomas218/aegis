@@ -4,13 +4,14 @@ import {
   HttpCode,
   HttpStatus,
   Post,
-  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { CredentialsDTO } from './dto/credentials-dto';
 import { RefreshDTO } from './dto/refresh-dto';
+import { ForgotPasswordDTO } from './dto/forgot-password.dto';
+import { ResetPasswordDTO } from './dto/reset-password.dto';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import type { AuthenticatedRequest } from './types/authenticated-request.type';
 import type { Request } from 'express';
@@ -48,18 +49,22 @@ export class AuthController {
     await this.auth.logout(refresh.refreshToken);
   }
 
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK)
   @Post('forgot-password')
-  async forgotPassword(@Query('email') email: string) {
-    // TODO: Implement forgot password functionality
+  async forgotPassword(@Body() forgotPassword: ForgotPasswordDTO) {
+    await this.auth.forgotPassword(forgotPassword.email);
+
+    return {
+      message: 'If an account exists, a password reset link will be sent.',
+    };
   }
 
   @HttpCode(HttpStatus.NO_CONTENT)
   @Post('reset-password')
-  async resetPassword(
-    @Query('token') token: string,
-    @Body() body: { newPassword: string },
-  ) {
-    // TODO: Implement reset password functionality
+  async resetPassword(@Body() resetPassword: ResetPasswordDTO) {
+    await this.auth.resetPassword(
+      resetPassword.token,
+      resetPassword.newPassword,
+    );
   }
 }

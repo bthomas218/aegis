@@ -14,6 +14,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './roles/roles.guard';
 import { SessionsModule } from 'src/sessions/sessions.module';
 import { ResetTokensService } from './reset-tokens/reset-tokens.service';
+import { PasswordResetLinkService } from './password-reset-link.service';
 
 const EXPIRY_MINUTES = 60;
 
@@ -47,6 +48,7 @@ const EXPIRY_MINUTES = 60;
     JwtAuthGuard,
     RolesGuard,
     ResetTokensService,
+    PasswordResetLinkService,
   ],
   controllers: [AuthController],
   exports: [JwtAuthGuard, RolesGuard],

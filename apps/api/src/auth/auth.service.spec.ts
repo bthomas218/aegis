@@ -1,13 +1,16 @@
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as argon2 from 'argon2';
 import type { User } from 'src/generated/prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { SessionsService } from 'src/sessions/sessions.service';
 import { UsersService } from 'src/users/users.service';
 import { AuthService } from './auth.service';
 import { CredentialsDTO } from './dto/credentials-dto';
 import { RefreshTokensService } from './refresh-tokens/refresh-tokens.service';
+import { ResetTokensService } from './reset-tokens/reset-tokens.service';
+import { PasswordResetLinkService } from './password-reset-link.service';
 
 jest.mock('src/prisma/prisma.service', () => ({
   PrismaService: class PrismaService {},
@@ -34,14 +37,42 @@ describe('AuthService', () => {
     revoke: jest.fn(),
     logout: jest.fn(),
   };
+  const resetTokensServiceMock = {
+    create: jest.fn(),
+    find: jest.fn(),
+    markUsed: jest.fn(),
+  };
+  const sessionsServiceMock = {
+    revokeAll: jest.fn(),
+  };
+  const passwordResetLinkServiceMock = {
+    send: jest.fn(),
+    getLastToken: jest.fn(),
+  };
+  const txMock = {
+    user: {
+      update: jest.fn(),
+    },
+    passwordResetToken: {
+      update: jest.fn(),
+    },
+  };
+  const prismaServiceMock = {
+    $transaction: jest.fn(),
+  };
 
   beforeEach(async () => {
+    prismaServiceMock.$transaction.mockImplementation(
+      async (callback: (tx: typeof txMock) => Promise<unknown>) =>
+        callback(txMock),
+    );
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
         {
           provide: PrismaService,
-          useValue: {},
+          useValue: prismaServiceMock,
         },
         {
           provide: UsersService,
@@ -55,11 +86,27 @@ describe('AuthService', () => {
           provide: RefreshTokensService,
           useValue: refreshTokensServiceMock,
         },
+        {
+          provide: ResetTokensService,
+          useValue: resetTokensServiceMock,
+        },
+        {
+          provide: SessionsService,
+          useValue: sessionsServiceMock,
+        },
+        {
+          provide: PasswordResetLinkService,
+          useValue: passwordResetLinkServiceMock,
+        },
       ],
     }).compile();
 
     service = module.get<AuthService>(AuthService);
     jest.clearAllMocks();
+    prismaServiceMock.$transaction.mockImplementation(
+      async (callback: (tx: typeof txMock) => Promise<unknown>) =>
+        callback(txMock),
+    );
   });
 
   it('should be defined', () => {
@@ -296,5 +343,109 @@ describe('AuthService', () => {
     expect(refreshTokensServiceMock.logout).toHaveBeenCalledWith(
       'refresh-token',
     );
+  });
+
+  it('creates a reset token when forgot password receives an existing email', async () => {
+    const user = {
+      id: 'user-6',
+      email: 'reset@example.com',
+      password_hash: 'hashed-password',
+      role: userRole,
+    } as User;
+
+    usersServiceMock.findByEmail.mockResolvedValue(user);
+    resetTokensServiceMock.create.mockResolvedValue('opaque-token');
+
+    await expect(service.forgotPassword(user.email)).resolves.toBeUndefined();
+
+    expect(usersServiceMock.findByEmail).toHaveBeenCalledWith(user.email);
+    expect(resetTokensServiceMock.create).toHaveBeenCalledWith('user-6');
+    expect(passwordResetLinkServiceMock.send).toHaveBeenCalledWith(
+      user.email,
+      'opaque-token',
+    );
+  });
+
+  it('does not reveal missing users during forgot password', async () => {
+    usersServiceMock.findByEmail.mockRejectedValue(
+      new NotFoundException('User Not Found'),
+    );
+
+    await expect(
+      service.forgotPassword('missing@example.com'),
+    ).resolves.toBeUndefined();
+
+    expect(resetTokensServiceMock.create).not.toHaveBeenCalled();
+  });
+
+  it('resets a password, marks the token used, and revokes sessions', async () => {
+    const resetToken = {
+      id: 'reset-token-1',
+      userId: 'user-7',
+      tokenHash: 'token-hash',
+      expiresAt: new Date(Date.now() + 1000 * 60),
+      usedAt: null,
+    };
+
+    resetTokensServiceMock.find.mockResolvedValue(resetToken);
+    (argon2.hash as jest.MockedFunction<typeof argon2.hash>).mockResolvedValue(
+      'new-password-hash',
+    );
+
+    await expect(
+      service.resetPassword('opaque-token', 'new-password'),
+    ).resolves.toBeUndefined();
+
+    expect(resetTokensServiceMock.find).toHaveBeenCalledWith('opaque-token');
+    expect(argon2.hash).toHaveBeenCalledWith('new-password');
+    expect(txMock.user.update).toHaveBeenCalledWith({
+      where: {
+        id: 'user-7',
+      },
+      data: {
+        password_hash: 'new-password-hash',
+      },
+    });
+    expect(txMock.passwordResetToken.update).toHaveBeenCalledWith({
+      where: {
+        id: 'reset-token-1',
+      },
+      data: {
+        usedAt: expect.any(Date),
+      },
+    });
+    expect(sessionsServiceMock.revokeAll).toHaveBeenCalledWith('user-7');
+  });
+
+  it('rejects missing, used, or expired reset tokens', async () => {
+    resetTokensServiceMock.find.mockResolvedValueOnce(null);
+
+    await expect(
+      service.resetPassword('missing-token', 'new-password'),
+    ).rejects.toThrow(BadRequestException);
+
+    resetTokensServiceMock.find.mockResolvedValueOnce({
+      id: 'reset-token-2',
+      userId: 'user-7',
+      expiresAt: new Date(Date.now() + 1000 * 60),
+      usedAt: new Date(),
+    });
+
+    await expect(
+      service.resetPassword('used-token', 'new-password'),
+    ).rejects.toThrow(BadRequestException);
+
+    resetTokensServiceMock.find.mockResolvedValueOnce({
+      id: 'reset-token-3',
+      userId: 'user-7',
+      expiresAt: new Date(Date.now() - 1000 * 60),
+      usedAt: null,
+    });
+
+    await expect(
+      service.resetPassword('expired-token', 'new-password'),
+    ).rejects.toThrow(BadRequestException);
+    expect(txMock.user.update).not.toHaveBeenCalled();
+    expect(sessionsServiceMock.revokeAll).not.toHaveBeenCalled();
   });
 });
