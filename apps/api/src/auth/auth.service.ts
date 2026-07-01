@@ -17,7 +17,11 @@ export class AuthService {
     private readonly refreshTokens: RefreshTokensService,
   ) {}
 
-  async register(credentials: CredentialsDTO) {
+  async register(
+    credentials: CredentialsDTO,
+    userAgent?: string,
+    ipAddress?: string,
+  ) {
     const { email, password } = credentials;
     const password_hash = await argon2.hash(password);
 
@@ -25,14 +29,22 @@ export class AuthService {
 
     return {
       accessToken: await this.issueAccessToken(user),
-      refreshToken: await this.refreshTokens.create(user.id),
+      refreshToken: await this.refreshTokens.create(
+        user.id,
+        userAgent,
+        ipAddress,
+      ),
     };
   }
 
-  async login(user: User) {
+  async login(user: User, userAgent?: string, ipAddress?: string) {
     return {
       accessToken: await this.issueAccessToken(user),
-      refreshToken: await this.refreshTokens.create(user.id),
+      refreshToken: await this.refreshTokens.create(
+        user.id,
+        userAgent,
+        ipAddress,
+      ),
     };
   }
 

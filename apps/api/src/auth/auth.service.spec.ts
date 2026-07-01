@@ -86,7 +86,11 @@ describe('AuthService', () => {
       email: user.email,
       role: userRole,
     });
-    expect(refreshTokensServiceMock.create).toHaveBeenCalledWith('user-1');
+    expect(refreshTokensServiceMock.create).toHaveBeenCalledWith(
+      'user-1',
+      undefined,
+      undefined,
+    );
   });
 
   it('validates a user when credentials are valid', async () => {
@@ -176,7 +180,69 @@ describe('AuthService', () => {
       email: credentials.email,
       password_hash: 'hashed-password',
     });
-    expect(refreshTokensServiceMock.create).toHaveBeenCalledWith('user-2');
+    expect(refreshTokensServiceMock.create).toHaveBeenCalledWith(
+      'user-2',
+      undefined,
+      undefined,
+    );
+  });
+
+  it('passes request metadata when registering a user', async () => {
+    const credentials: CredentialsDTO = {
+      email: 'metadata@example.com',
+      password: 'password123',
+    };
+    const createdUser = {
+      id: 'user-4',
+      email: credentials.email,
+      password_hash: 'hashed-password',
+      role: userRole,
+    } as User;
+
+    (argon2.hash as jest.MockedFunction<typeof argon2.hash>).mockResolvedValue(
+      'hashed-password',
+    );
+    usersServiceMock.create.mockResolvedValue(createdUser);
+    jwtServiceMock.signAsync.mockResolvedValue('signed-token');
+    refreshTokensServiceMock.create.mockResolvedValue('refresh-token');
+
+    await expect(
+      service.register(credentials, 'Mozilla/5.0', '127.0.0.1'),
+    ).resolves.toEqual({
+      accessToken: 'signed-token',
+      refreshToken: 'refresh-token',
+    });
+
+    expect(refreshTokensServiceMock.create).toHaveBeenCalledWith(
+      'user-4',
+      'Mozilla/5.0',
+      '127.0.0.1',
+    );
+  });
+
+  it('passes request metadata when logging in a user', async () => {
+    const user = {
+      id: 'user-5',
+      email: 'metadata-login@example.com',
+      password_hash: 'hashed-password',
+      role: userRole,
+    } as User;
+
+    jwtServiceMock.signAsync.mockResolvedValue('signed-token');
+    refreshTokensServiceMock.create.mockResolvedValue('refresh-token');
+
+    await expect(
+      service.login(user, 'Mozilla/5.0', '127.0.0.1'),
+    ).resolves.toEqual({
+      accessToken: 'signed-token',
+      refreshToken: 'refresh-token',
+    });
+
+    expect(refreshTokensServiceMock.create).toHaveBeenCalledWith(
+      'user-5',
+      'Mozilla/5.0',
+      '127.0.0.1',
+    );
   });
 
   it('rotates a refresh token and returns a new access and refresh token', async () => {

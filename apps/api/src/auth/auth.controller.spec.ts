@@ -5,6 +5,7 @@ import { AuthService } from './auth.service';
 import { CredentialsDTO } from './dto/credentials-dto';
 import { RefreshDTO } from './dto/refresh-dto';
 import type { AuthenticatedRequest } from './types/authenticated-request.type';
+import type { Request } from 'express';
 
 jest.mock('./auth.service', () => ({
   AuthService: class AuthService {},
@@ -16,11 +17,11 @@ describe('AuthController', () => {
   const authServiceMock = {
     register: jest.fn<
       Promise<{ accessToken: string; refreshToken: string }>,
-      [CredentialsDTO]
+      [CredentialsDTO, string | undefined, string | undefined]
     >(),
     login: jest.fn<
       Promise<{ accessToken: string; refreshToken: string }>,
-      [User]
+      [User, string | undefined, string | undefined]
     >(),
     refresh: jest.fn<
       Promise<{ accessToken: string; refreshToken: string }>,
@@ -57,11 +58,26 @@ describe('AuthController', () => {
       accessToken: 'registered-token',
       refreshToken: 'registered-refresh-token',
     };
+    const req = {
+      headers: {
+        'user-agent': 'Mozilla/5.0',
+      },
+      ip: '127.0.0.1',
+      socket: {
+        remoteAddress: '10.0.0.1',
+      },
+    } as Request;
 
     authServiceMock.register.mockResolvedValue(response);
 
-    await expect(controller.register(credentials)).resolves.toEqual(response);
-    expect(authServiceMock.register).toHaveBeenCalledWith(credentials);
+    await expect(controller.register(credentials, req)).resolves.toEqual(
+      response,
+    );
+    expect(authServiceMock.register).toHaveBeenCalledWith(
+      credentials,
+      'Mozilla/5.0',
+      '127.0.0.1',
+    );
   });
 
   it('logs in a user by delegating to the auth service', async () => {
@@ -71,7 +87,16 @@ describe('AuthController', () => {
       password_hash: 'hashed-password',
       role: userRole,
     } as User;
-    const req = { user } as AuthenticatedRequest;
+    const req = {
+      user,
+      headers: {
+        'user-agent': 'Mozilla/5.0',
+      },
+      ip: '127.0.0.1',
+      socket: {
+        remoteAddress: '10.0.0.1',
+      },
+    } as AuthenticatedRequest;
     const response = {
       accessToken: 'login-token',
       refreshToken: 'login-refresh-token',
@@ -80,7 +105,11 @@ describe('AuthController', () => {
     authServiceMock.login.mockResolvedValue(response);
 
     await expect(controller.login(req)).resolves.toEqual(response);
-    expect(authServiceMock.login).toHaveBeenCalledWith(user);
+    expect(authServiceMock.login).toHaveBeenCalledWith(
+      user,
+      'Mozilla/5.0',
+      '127.0.0.1',
+    );
   });
 
   it('refreshes a token pair by delegating to the auth service', async () => {

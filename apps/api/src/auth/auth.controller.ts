@@ -12,6 +12,7 @@ import { CredentialsDTO } from './dto/credentials-dto';
 import { RefreshDTO } from './dto/refresh-dto';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import type { AuthenticatedRequest } from './types/authenticated-request.type';
+import type { Request } from 'express';
 
 @Controller('auth')
 export class AuthController {
@@ -19,15 +20,19 @@ export class AuthController {
 
   @HttpCode(HttpStatus.CREATED)
   @Post('register')
-  async register(@Body() credentials: CredentialsDTO) {
-    return await this.auth.register(credentials);
+  async register(@Body() credentials: CredentialsDTO, @Req() req: Request) {
+    const userAgent = req.headers['user-agent'];
+    const ipAddress = req.ip || req.socket.remoteAddress;
+    return await this.auth.register(credentials, userAgent, ipAddress);
   }
 
   @UseGuards(LocalAuthGuard)
   @HttpCode(HttpStatus.OK)
   @Post('login')
   async login(@Req() req: AuthenticatedRequest) {
-    return await this.auth.login(req.user);
+    const userAgent = req.headers['user-agent'];
+    const ipAddress = req.ip || req.socket.remoteAddress;
+    return await this.auth.login(req.user, userAgent, ipAddress);
   }
 
   @HttpCode(HttpStatus.OK)
