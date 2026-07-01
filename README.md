@@ -1,27 +1,13 @@
 # Aegis
 
-Aegis is a Turbo monorepo for a NestJS authentication API backed by Prisma. The current implementation focuses on user registration, login, JWT-based access token issuance, refresh token rotation, and logout token revocation.
+Aegis is a Turbo monorepo for a NestJS authentication API backed by Prisma and Postgres. The API supports registration, login, JWT access tokens, refresh token rotation, logout, authenticated user profile lookup, and role-gated admin user management.
 
-## What is in this repo?
-
-### Apps
-
-- apps/api: the main NestJS backend application
-  - authentication endpoints for register, login, refresh, and logout
-  - Prisma-based user persistence
-  - JWT, refresh token, and password hashing utilities
-  - unit and end-to-end tests
-
-### Packages
-
-- packages/eslint-config: shared ESLint rules for the monorepo
-- packages/typescript-config: shared TypeScript configuration
-
-## Repository structure
+## Repository Structure
 
 ```text
 apps/
   api/
+    prisma/
     src/
       auth/
       prisma/
@@ -32,27 +18,29 @@ packages/
   typescript-config/
 ```
 
-## Getting started
+## Requirements
 
-1. Install dependencies:
+- Node.js 18 or newer
+- pnpm
+- Docker, for the local Postgres service
+
+## Local Setup
+
+Install dependencies:
 
 ```bash
 pnpm install
 ```
 
-2. Start the local development database:
+Start local infrastructure:
 
 ```bash
 docker compose up -d postgres
 ```
 
-The compose file starts Postgres on `localhost:5432` with:
+The compose file exposes Postgres on `localhost:5432`.
 
-- user: `aegis`
-- password: `password`
-- database: `aegis`
-
-3. Configure environment variables for the API before starting it. Create `apps/api/.env` with:
+Create `apps/api/.env`:
 
 ```bash
 DATABASE_URL="postgresql://aegis:password@localhost:5432/aegis"
@@ -60,19 +48,13 @@ JWT_SECRET="replace-me-with-a-local-secret"
 PORT=3000
 ```
 
-The API expects:
-
-- DATABASE_URL
-- JWT_SECRET
-- PORT (optional)
-
-4. Apply database migrations:
+Apply migrations:
 
 ```bash
 pnpm --filter api exec prisma migrate dev
 ```
 
-5. Seed local development users:
+Seed development users:
 
 ```bash
 pnpm --filter api db:seed
@@ -85,38 +67,46 @@ The seed creates or updates these development-only login users:
 | Admin | `admin@aegis.local` | `Admin123!` |
 | Super admin | `super-admin@aegis.local` | `SuperAdmin123!` |
 
-6. Start the API:
+Start the API:
 
 ```bash
 pnpm --filter api dev
 ```
 
-## Available scripts
+The API listens on `http://localhost:3000` unless `PORT` is set.
+
+## Scripts
 
 From the repository root:
 
 ```bash
 pnpm build
 pnpm lint
+pnpm --filter api build
+pnpm --filter api db:seed
 pnpm --filter api test
 pnpm --filter api test:e2e
 ```
 
-## API highlights
+## API Surface
 
-The backend currently provides:
+### Health
 
-- POST /auth/register to create a user and issue access and refresh tokens
-- POST /auth/login to authenticate an existing user and issue access and refresh tokens
-- POST /auth/refresh to rotate a refresh token and issue a new token pair
-- POST /auth/logout to revoke a refresh token and return no content
-- Prisma-backed user lookup and creation logic
-- Prisma-backed refresh token persistence and revocation
-- Validation and error handling for authentication flow
+#### `GET /`
 
-### Auth endpoints
+Response: `200 OK`
 
-#### POST /auth/register
+```json
+{
+  "status": "OK"
+}
+```
+
+### Auth
+
+#### `POST /auth/register`
+
+Creates a user with role `USER` and returns an access token and refresh token.
 
 Request:
 
@@ -136,7 +126,9 @@ Response: `201 Created`
 }
 ```
 
-#### POST /auth/login
+#### `POST /auth/login`
+
+Authenticates an existing user and returns an access token and refresh token.
 
 Request:
 
@@ -156,7 +148,9 @@ Response: `200 OK`
 }
 ```
 
-#### POST /auth/refresh
+#### `POST /auth/refresh`
+
+Rotates a refresh token. The old refresh token is revoked and a new token pair is returned.
 
 Request:
 
@@ -175,9 +169,9 @@ Response: `200 OK`
 }
 ```
 
-The provided refresh token is revoked when it is rotated.
+#### `POST /auth/logout`
 
-#### POST /auth/logout
+Revokes a refresh token.
 
 Request:
 
@@ -189,23 +183,164 @@ Request:
 
 Response: `204 No Content`
 
-The provided refresh token is revoked and the response body is empty.
+### Users
+
+All user endpoints require a bearer access token.
+
+#### `GET /users/me`
+
+Returns the authenticated user's public profile.
+
+Response: `200 OK`
+
+```json
+{
+  "id": "user-id",
+  "email": "user@example.com",
+  "createdAt": "2026-07-01T00:00:00.000Z",
+  "role": "USER"
+}
+```
+
+### Admin Users
+
+All admin endpoints require a bearer access token. `ADMIN` and `SYSTEM_ADMIN` can read users. Only `SYSTEM_ADMIN` can create, update, or delete users. Route `:id` parameters must be UUIDs.
+
+#### `GET /admin/users`
+
+Query parameters:
+
+- `page`: optional integer, minimum `1`, default `1`
+- `limit`: optional integer, `1` through `100`, default `10`
+- `search`: optional email search string
+- `role`: optional `USER`, `ADMIN`, or `SYSTEM_ADMIN`
+
+Response: `200 OK`
+
+```json
+{
+  "data": [
+    {
+      "id": "user-id",
+      "email": "user@example.com",
+      "role": "USER",
+      "createdAt": "2026-07-01T00:00:00.000Z",
+      "updatedAt": "2026-07-01T00:00:00.000Z"
+    }
+  ],
+  "meta": {
+    "totalItems": 1,
+    "itemCount": 1,
+    "itemsPerPage": 10,
+    "totalPages": 1,
+    "currentPage": 1
+  }
+}
+```
+
+#### `GET /admin/users/:id`
+
+Response: `200 OK`
+
+```json
+{
+  "id": "user-id",
+  "email": "user@example.com",
+  "role": "USER",
+  "createdAt": "2026-07-01T00:00:00.000Z",
+  "updatedAt": "2026-07-01T00:00:00.000Z"
+}
+```
+
+#### `POST /admin/users`
+
+Requires `SYSTEM_ADMIN`.
+
+Request:
+
+```json
+{
+  "email": "admin-created@example.com",
+  "password_hash": "already-hashed-password",
+  "role": "ADMIN"
+}
+```
+
+Response: `201 Created`
+
+```json
+{
+  "id": "user-id",
+  "email": "admin-created@example.com",
+  "role": "ADMIN",
+  "createdAt": "2026-07-01T00:00:00.000Z",
+  "updatedAt": "2026-07-01T00:00:00.000Z"
+}
+```
+
+#### `PATCH /admin/users/:id`
+
+Requires `SYSTEM_ADMIN`.
+
+Request:
+
+```json
+{
+  "email": "updated@example.com",
+  "role": "ADMIN"
+}
+```
+
+Response: `200 OK`
+
+```json
+{
+  "id": "user-id",
+  "email": "updated@example.com",
+  "role": "ADMIN",
+  "createdAt": "2026-07-01T00:00:00.000Z",
+  "updatedAt": "2026-07-01T00:00:00.000Z"
+}
+```
+
+#### `DELETE /admin/users/:id`
+
+Requires `SYSTEM_ADMIN`.
+
+Response: `200 OK`
+
+```json
+{
+  "id": "user-id",
+  "email": "updated@example.com",
+  "role": "ADMIN",
+  "createdAt": "2026-07-01T00:00:00.000Z",
+  "updatedAt": "2026-07-01T00:00:00.000Z"
+}
+```
 
 ## Testing
 
-The API includes both unit and end-to-end tests for the auth flow:
+Run unit tests:
 
 ```bash
 pnpm --filter api test
+```
+
+Run end-to-end tests:
+
+```bash
 pnpm --filter api test:e2e
 ```
 
-## Tech stack
+Run type and build checks:
 
-- NestJS
-- TypeScript
-- Prisma
-- JWT
-- Argon2
-- Turbo
-- pnpm
+```bash
+pnpm --filter api exec tsc --noEmit -p tsconfig.json
+pnpm --filter api build
+```
+
+## Notes
+
+- `password_hash` on admin create/update expects an already-hashed password value. Public registration accepts a plain `password` and hashes it before persistence.
+- Seeded users are for local development only.
