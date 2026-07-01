@@ -31,6 +31,7 @@ describe('AuthService', () => {
     create: jest.fn(),
     rotate: jest.fn(),
     revoke: jest.fn(),
+    logout: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -207,11 +208,11 @@ describe('AuthService', () => {
   });
 
   it('logs out a user by revoking the refresh token', async () => {
-    refreshTokensServiceMock.revoke.mockResolvedValue(undefined);
+    refreshTokensServiceMock.logout.mockResolvedValue(undefined);
 
     await expect(service.logout('refresh-token')).resolves.toBeUndefined();
 
-    expect(refreshTokensServiceMock.revoke).toHaveBeenCalledWith(
+    expect(refreshTokensServiceMock.logout).toHaveBeenCalledWith(
       'refresh-token',
     );
   });

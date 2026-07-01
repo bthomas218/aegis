@@ -64,7 +64,7 @@ export class AuthService {
   }
 
   async logout(refreshToken: string) {
-    await this.refreshTokens.revoke(refreshToken);
+    await this.refreshTokens.logout(refreshToken);
   }
 
   async issueAccessToken(user: Omit<User, 'password_hash'>) {

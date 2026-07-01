@@ -394,4 +394,53 @@ describe('RefreshTokensService', () => {
     expect(txMock.refreshToken.update).not.toHaveBeenCalled();
     expect(txMock.refreshToken.create).not.toHaveBeenCalled();
   });
+
+  it('logs out by revoking the token session and all active tokens in it', async () => {
+    const token = 'logout-token';
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+    txMock.refreshToken.findUnique.mockResolvedValue({
+      sessionId: 'session-1',
+    });
+    txMock.session.updateMany.mockResolvedValue({ count: 1 });
+    txMock.refreshToken.updateMany.mockResolvedValue({ count: 2 });
+
+    await expect(service.logout(token)).resolves.toBeUndefined();
+
+    expect(txMock.refreshToken.findUnique).toHaveBeenCalledWith({
+      where: {
+        tokenHash,
+      },
+      select: {
+        sessionId: true,
+      },
+    });
+    expect(txMock.session.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'session-1',
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: expect.any(Date),
+      },
+    });
+    expect(txMock.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: {
+        sessionId: 'session-1',
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: expect.any(Date),
+      },
+    });
+  });
+
+  it('does not revoke anything on logout when the token is missing', async () => {
+    txMock.refreshToken.findUnique.mockResolvedValue(null);
+
+    await expect(service.logout('missing-token')).resolves.toBeUndefined();
+
+    expect(txMock.session.updateMany).not.toHaveBeenCalled();
+    expect(txMock.refreshToken.updateMany).not.toHaveBeenCalled();
+  });
 });

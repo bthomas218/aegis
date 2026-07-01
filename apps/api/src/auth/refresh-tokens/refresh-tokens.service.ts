@@ -80,7 +80,7 @@ export class RefreshTokensService {
   async rotate(token: string) {
     const tokenHash = this.hashToken(token);
 
-    return await this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const oldToken = await tx.refreshToken.findUnique({
         where: {
           tokenHash,
@@ -107,7 +107,8 @@ export class RefreshTokensService {
       }
 
       if (oldToken.revokedAt !== null) {
-        //Token Reuse detected
+        // Token reuse detected. Return a marker so these writes commit before
+        // the caller receives the unauthorized error.
         await tx.refreshToken.updateMany({
           where: {
             familyId: oldToken.familyId,
@@ -127,7 +128,9 @@ export class RefreshTokensService {
             revokedAt: new Date(),
           },
         });
-        throw new UnauthorizedException('Refresh Token Reuse Detected');
+        return {
+          reuseDetected: true,
+        } as const;
       }
 
       if (oldToken.expiresAt <= new Date()) {
@@ -155,9 +158,57 @@ export class RefreshTokensService {
       });
 
       return {
+        reuseDetected: false,
         user: oldToken.session.user,
         newToken,
-      };
+      } as const;
+    });
+
+    if (result.reuseDetected) {
+      throw new UnauthorizedException('Refresh Token Reuse Detected');
+    }
+
+    return {
+      user: result.user,
+      newToken: result.newToken,
+    };
+  }
+
+  async logout(token: string) {
+    const tokenHash = this.hashToken(token);
+    const now = new Date();
+
+    await this.prisma.$transaction(async (tx) => {
+      const refreshToken = await tx.refreshToken.findUnique({
+        where: {
+          tokenHash,
+        },
+        select: {
+          sessionId: true,
+        },
+      });
+
+      if (!refreshToken) return;
+
+      await tx.session.updateMany({
+        where: {
+          id: refreshToken.sessionId,
+          revokedAt: null,
+        },
+        data: {
+          revokedAt: now,
+        },
+      });
+
+      await tx.refreshToken.updateMany({
+        where: {
+          sessionId: refreshToken.sessionId,
+          revokedAt: null,
+        },
+        data: {
+          revokedAt: now,
+        },
+      });
     });
   }
 

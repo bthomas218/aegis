@@ -13,7 +13,7 @@ export class SessionsService {
         expiresAt: createSession.expiresAt,
         userAgent: createSession.userAgent,
         ipAddress: createSession.ipAddress,
-        refreshToken: {
+        refreshTokens: {
           create: {
             tokenHash: createSession.refreshToken.tokenHash,
             expiresAt: createSession.refreshToken.expiresAt,

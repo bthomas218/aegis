@@ -72,7 +72,7 @@ describe('SessionsService', () => {
         expiresAt,
         userAgent: 'Mozilla/5.0',
         ipAddress: '127.0.0.1',
-        refreshToken: {
+        refreshTokens: {
           create: {
             tokenHash: 'token-hash',
             expiresAt,
