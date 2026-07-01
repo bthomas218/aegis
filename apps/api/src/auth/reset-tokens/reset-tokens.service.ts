@@ -1,18 +1,54 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { CreateResetTokenDTO } from './dto/create-reset-token.dto';
+import * as tokenUtils from 'src/utils/token-utils';
 
 const RESET_TOKEN_EXPIRATION_MINUTES = 15;
 @Injectable()
 export class ResetTokensService {
   constructor(private readonly prisma: PrismaService) {}
 
-  //TODO: Implement the create method to create a new reset token in the database
-  async create(createResetToken: CreateResetTokenDTO) {}
+  async create(userId: string) {
+    const token = tokenUtils.generateRandomToken();
+    const tokenHash = tokenUtils.hashToken(token);
+    const expiresAt = this.getTokenExpiry();
 
-  //TODO: Implement the find method to find a reset token in the database by its token hash
-  async find(token: string) {}
+    await this.prisma.passwordResetToken.create({
+      data: {
+        userId,
+        tokenHash,
+        expiresAt,
+      },
+    });
 
-  //TODO: Implement the markUsed method to mark a reset token as used in the database
-  async markUsed(token: string) {}
+    return token;
+  }
+
+  async find(token: string) {
+    const tokenHash = tokenUtils.hashToken(token);
+
+    return await this.prisma.passwordResetToken.findUnique({
+      where: {
+        tokenHash,
+      },
+    });
+  }
+
+  async markUsed(id: string) {
+    await this.prisma.passwordResetToken.update({
+      where: {
+        id,
+      },
+      data: {
+        usedAt: new Date(),
+      },
+    });
+  }
+
+  private getTokenExpiry() {
+    const expiresAt = new Date();
+    expiresAt.setMinutes(
+      expiresAt.getMinutes() + RESET_TOKEN_EXPIRATION_MINUTES,
+    );
+    return expiresAt;
+  }
 }
