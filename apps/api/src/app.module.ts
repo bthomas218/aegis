@@ -6,6 +6,7 @@ import { ConfigModule } from '@nestjs/config';
 import { z } from 'zod';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
+import { SessionsModule } from './sessions/sessions.module';
 
 const envSchema = z.object({
   NODE_ENV: z
@@ -35,6 +36,7 @@ function validate(config: Record<string, unknown>) {
     }),
     UsersModule,
     AuthModule,
+    SessionsModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],

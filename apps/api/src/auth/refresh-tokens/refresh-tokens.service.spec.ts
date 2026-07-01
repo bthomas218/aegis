@@ -7,6 +7,7 @@ jest.mock('src/prisma/prisma.service', () => ({
 }));
 
 import { PrismaService } from 'src/prisma/prisma.service';
+import { SessionsService } from 'src/sessions/sessions.service';
 import { RefreshTokensService } from './refresh-tokens.service';
 
 describe('RefreshTokensService', () => {
@@ -17,6 +18,10 @@ describe('RefreshTokensService', () => {
       findUnique: jest.Mock<Promise<unknown>, [unknown]>;
       update: jest.Mock<Promise<unknown>, [unknown]>;
       create: jest.Mock<Promise<unknown>, [unknown]>;
+      updateMany: jest.Mock<Promise<unknown>, [unknown]>;
+    };
+    session: {
+      updateMany: jest.Mock<Promise<unknown>, [unknown]>;
     };
   };
 
@@ -24,18 +29,22 @@ describe('RefreshTokensService', () => {
 
   const prismaServiceMock: {
     refreshToken: {
-      create: jest.Mock<Promise<unknown>, [unknown]>;
       findUnique: jest.Mock<Promise<unknown>, [unknown]>;
       updateMany: jest.Mock<Promise<unknown>, [unknown]>;
     };
     $transaction: jest.Mock<Promise<unknown>, [TransactionCallback]>;
   } = {
     refreshToken: {
-      create: jest.fn<Promise<unknown>, [unknown]>(),
       findUnique: jest.fn<Promise<unknown>, [unknown]>(),
       updateMany: jest.fn<Promise<unknown>, [unknown]>(),
     },
     $transaction: jest.fn<Promise<unknown>, [TransactionCallback]>(),
+  };
+
+  const sessionsServiceMock: {
+    create: jest.Mock<Promise<unknown>, [unknown]>;
+  } = {
+    create: jest.fn<Promise<unknown>, [unknown]>(),
   };
 
   let txMock: TransactionMock;
@@ -46,16 +55,20 @@ describe('RefreshTokensService', () => {
         findUnique: jest.fn<Promise<unknown>, [unknown]>(),
         update: jest.fn<Promise<unknown>, [unknown]>(),
         create: jest.fn<Promise<unknown>, [unknown]>(),
+        updateMany: jest.fn<Promise<unknown>, [unknown]>(),
+      },
+      session: {
+        updateMany: jest.fn<Promise<unknown>, [unknown]>(),
       },
     };
 
-    prismaServiceMock.refreshToken.create.mockReset();
     prismaServiceMock.refreshToken.findUnique.mockReset();
     prismaServiceMock.refreshToken.updateMany.mockReset();
     prismaServiceMock.$transaction.mockReset();
     prismaServiceMock.$transaction.mockImplementation(
       async (callback: TransactionCallback) => callback(txMock),
     );
+    sessionsServiceMock.create.mockReset();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -63,6 +76,10 @@ describe('RefreshTokensService', () => {
         {
           provide: PrismaService,
           useValue: prismaServiceMock,
+        },
+        {
+          provide: SessionsService,
+          useValue: sessionsServiceMock,
         },
       ],
     }).compile();
@@ -75,25 +92,32 @@ describe('RefreshTokensService', () => {
   });
 
   it('creates a refresh token and stores a hashed copy for the user', async () => {
-    prismaServiceMock.refreshToken.create.mockResolvedValue({ id: 'token-1' });
+    sessionsServiceMock.create.mockResolvedValue({ id: 'session-1' });
 
-    const token = await service.create('user-1');
+    const token = await service.create('user-1', 'Mozilla/5.0', '127.0.0.1');
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
     expect(token).toEqual(expect.any(String));
 
-    const createArgs = prismaServiceMock.refreshToken.create.mock
-      .calls[0]?.[0] as {
-      data: {
+    const createArgs = sessionsServiceMock.create.mock.calls[0]?.[0] as {
+      userId: string;
+      expiresAt: Date;
+      userAgent: string;
+      ipAddress: string;
+      refreshToken: {
         tokenHash: string;
-        userId: string;
         expiresAt: Date;
+        familyId: string;
       };
     };
 
-    expect(createArgs.data.tokenHash).toBe(tokenHash);
-    expect(createArgs.data.userId).toBe('user-1');
-    expect(createArgs.data.expiresAt).toBeInstanceOf(Date);
+    expect(createArgs.userId).toBe('user-1');
+    expect(createArgs.expiresAt).toBeInstanceOf(Date);
+    expect(createArgs.userAgent).toBe('Mozilla/5.0');
+    expect(createArgs.ipAddress).toBe('127.0.0.1');
+    expect(createArgs.refreshToken.tokenHash).toBe(tokenHash);
+    expect(createArgs.refreshToken.expiresAt).toBe(createArgs.expiresAt);
+    expect(createArgs.refreshToken.familyId).toEqual(expect.any(String));
   });
 
   it('returns a refresh token record when validation succeeds', async () => {
@@ -176,12 +200,18 @@ describe('RefreshTokensService', () => {
     const oldTokenRecord = {
       id: 'token-1',
       tokenHash,
-      userId: 'user-1',
+      sessionId: 'session-1',
+      familyId: 'family-1',
       revokedAt: null,
       expiresAt: new Date(Date.now() + 1000 * 60 * 60),
-      user: {
-        id: 'user-1',
-        email: 'user@example.com',
+      session: {
+        id: 'session-1',
+        revokedAt: null,
+        expiresAt: new Date(Date.now() + 1000 * 60 * 60),
+        user: {
+          id: 'user-1',
+          email: 'user@example.com',
+        },
       },
     };
 
@@ -192,17 +222,19 @@ describe('RefreshTokensService', () => {
     const result = await service.rotate(token);
 
     expect(result).toMatchObject({
-      user: oldTokenRecord.user,
+      user: oldTokenRecord.session.user,
     });
     expect(typeof result.newToken).toBe('string');
 
     const findUniqueArgs = txMock.refreshToken.findUnique.mock
       .calls[0]?.[0] as {
       where: { tokenHash: string };
-      include: { user: true };
+      include: { session: { include: { user: true } } };
     };
     expect(findUniqueArgs.where.tokenHash).toBe(tokenHash);
-    expect(findUniqueArgs.include).toEqual({ user: true });
+    expect(findUniqueArgs.include).toEqual({
+      session: { include: { user: true } },
+    });
 
     const updateArgs = txMock.refreshToken.update.mock.calls[0]?.[0] as {
       where: { tokenHash: string };
@@ -215,20 +247,150 @@ describe('RefreshTokensService', () => {
       data: {
         tokenHash: string;
         expiresAt: Date;
-        userId: string;
+        familyId: string;
+        sessionId: string;
+        parentId: string;
       };
     };
     expect(typeof createArgs.data.tokenHash).toBe('string');
     expect(createArgs.data.expiresAt).toBeInstanceOf(Date);
-    expect(createArgs.data.userId).toBe('user-1');
+    expect(createArgs.data.familyId).toBe('family-1');
+    expect(createArgs.data.sessionId).toBe('session-1');
+    expect(createArgs.data.parentId).toBe('token-1');
   });
 
   it('rejects rotation when the token is invalid', async () => {
-    const token = 'expired-token';
+    const token = 'missing-token';
 
     txMock.refreshToken.findUnique.mockResolvedValue(null);
 
     await expect(service.rotate(token)).rejects.toThrow(UnauthorizedException);
+    expect(txMock.refreshToken.update).not.toHaveBeenCalled();
+    expect(txMock.refreshToken.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects rotation when the session is revoked or expired', async () => {
+    const token = 'token-with-invalid-session';
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+    txMock.refreshToken.findUnique.mockResolvedValueOnce({
+      id: 'token-1',
+      tokenHash,
+      sessionId: 'session-1',
+      familyId: 'family-1',
+      revokedAt: null,
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60),
+      session: {
+        id: 'session-1',
+        revokedAt: new Date(),
+        expiresAt: new Date(Date.now() + 1000 * 60 * 60),
+        user: { id: 'user-1', email: 'user@example.com' },
+      },
+    });
+
+    await expect(service.rotate(token)).rejects.toThrow(
+      'Invalid Refresh Token',
+    );
+
+    txMock.refreshToken.findUnique.mockResolvedValueOnce({
+      id: 'token-2',
+      tokenHash,
+      sessionId: 'session-2',
+      familyId: 'family-2',
+      revokedAt: null,
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60),
+      session: {
+        id: 'session-2',
+        revokedAt: null,
+        expiresAt: new Date(Date.now() - 1000 * 60 * 60),
+        user: { id: 'user-1', email: 'user@example.com' },
+      },
+    });
+
+    await expect(service.rotate(token)).rejects.toThrow(
+      'Invalid Refresh Token',
+    );
+    expect(txMock.refreshToken.updateMany).not.toHaveBeenCalled();
+    expect(txMock.session.updateMany).not.toHaveBeenCalled();
+    expect(txMock.refreshToken.update).not.toHaveBeenCalled();
+    expect(txMock.refreshToken.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects rotation when the token is expired', async () => {
+    const token = 'expired-token';
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+    txMock.refreshToken.findUnique.mockResolvedValue({
+      id: 'token-1',
+      tokenHash,
+      sessionId: 'session-1',
+      familyId: 'family-1',
+      revokedAt: null,
+      expiresAt: new Date(Date.now() - 1000 * 60 * 60),
+      session: {
+        id: 'session-1',
+        revokedAt: null,
+        expiresAt: new Date(Date.now() + 1000 * 60 * 60),
+        user: { id: 'user-1', email: 'user@example.com' },
+      },
+    });
+
+    await expect(service.rotate(token)).rejects.toThrow(
+      'Invalid Refresh Token',
+    );
+    expect(txMock.refreshToken.updateMany).not.toHaveBeenCalled();
+    expect(txMock.session.updateMany).not.toHaveBeenCalled();
+    expect(txMock.refreshToken.update).not.toHaveBeenCalled();
+    expect(txMock.refreshToken.create).not.toHaveBeenCalled();
+  });
+
+  it('revokes a token family and session when token reuse is detected', async () => {
+    const token = 'reused-token';
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const oldTokenRecord = {
+      id: 'token-1',
+      tokenHash,
+      sessionId: 'session-1',
+      familyId: 'family-1',
+      revokedAt: new Date(),
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60),
+      session: {
+        id: 'session-1',
+        revokedAt: null,
+        expiresAt: new Date(Date.now() + 1000 * 60 * 60),
+        user: {
+          id: 'user-1',
+          email: 'user@example.com',
+        },
+      },
+    };
+
+    txMock.refreshToken.findUnique.mockResolvedValue(oldTokenRecord);
+    txMock.refreshToken.updateMany.mockResolvedValue({ count: 1 });
+    txMock.session.updateMany.mockResolvedValue({ count: 1 });
+
+    await expect(service.rotate(token)).rejects.toThrow(
+      'Refresh Token Reuse Detected',
+    );
+
+    expect(txMock.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: {
+        familyId: 'family-1',
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: expect.any(Date),
+      },
+    });
+    expect(txMock.session.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'session-1',
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: expect.any(Date),
+      },
+    });
     expect(txMock.refreshToken.update).not.toHaveBeenCalled();
     expect(txMock.refreshToken.create).not.toHaveBeenCalled();
   });

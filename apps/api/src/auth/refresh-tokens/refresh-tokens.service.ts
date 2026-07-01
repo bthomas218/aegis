@@ -1,22 +1,32 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import crypto from 'node:crypto';
+import { SessionsService } from 'src/sessions/sessions.service';
 
 const EXPIRY_DAYS = 7;
 
 @Injectable()
 export class RefreshTokensService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly sessions: SessionsService,
+  ) {}
 
-  async create(userId: string) {
+  async create(userId: string, userAgent?: string, ipAddress?: string) {
     const token = this.generateToken();
     const tokenHash = this.hashToken(token);
     const expiresAt = this.getTokenExpiry();
-    await this.prisma.refreshToken.create({
-      data: {
+    const familyId = crypto.randomUUID();
+
+    await this.sessions.create({
+      userId,
+      expiresAt,
+      userAgent,
+      ipAddress,
+      refreshToken: {
         tokenHash,
-        userId,
         expiresAt,
+        familyId,
       },
     });
 
@@ -55,6 +65,18 @@ export class RefreshTokensService {
     });
   }
 
+  async revokeFamily(familyId: string) {
+    await this.prisma.refreshToken.updateMany({
+      where: {
+        familyId,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+      },
+    });
+  }
+
   async rotate(token: string) {
     const tokenHash = this.hashToken(token);
 
@@ -64,17 +86,66 @@ export class RefreshTokensService {
           tokenHash,
         },
         include: {
-          user: true,
+          session: {
+            include: {
+              user: true,
+            },
+          },
         },
       });
 
+      if (!oldToken) {
+        throw new UnauthorizedException('Invalid Refresh Token');
+      }
+
       if (
-        !oldToken ||
-        oldToken.revokedAt !== null ||
-        oldToken.expiresAt <= new Date()
+        !oldToken.session ||
+        oldToken.session.revokedAt ||
+        oldToken.session.expiresAt <= new Date()
       ) {
         throw new UnauthorizedException('Invalid Refresh Token');
       }
+
+      if (oldToken.revokedAt !== null) {
+        //Token Reuse detected
+        await tx.refreshToken.updateMany({
+          where: {
+            familyId: oldToken.familyId,
+            revokedAt: null,
+          },
+          data: {
+            revokedAt: new Date(),
+          },
+        });
+
+        await tx.session.updateMany({
+          where: {
+            id: oldToken.sessionId,
+            revokedAt: null,
+          },
+          data: {
+            revokedAt: new Date(),
+          },
+        });
+        throw new UnauthorizedException('Refresh Token Reuse Detected');
+      }
+
+      if (oldToken.expiresAt <= new Date()) {
+        throw new UnauthorizedException('Invalid Refresh Token');
+      }
+
+      const newToken = this.generateToken();
+      const newTokenHash = this.hashToken(newToken);
+
+      await tx.refreshToken.create({
+        data: {
+          tokenHash: newTokenHash,
+          expiresAt: oldToken.expiresAt,
+          familyId: oldToken.familyId,
+          sessionId: oldToken.sessionId,
+          parentId: oldToken.id,
+        },
+      });
 
       await tx.refreshToken.update({
         where: { tokenHash },
@@ -82,20 +153,9 @@ export class RefreshTokensService {
           revokedAt: new Date(),
         },
       });
-      const newToken = this.generateToken();
-      const newTokenHash = this.hashToken(newToken);
-      const expiresAt = this.getTokenExpiry();
-
-      await tx.refreshToken.create({
-        data: {
-          tokenHash: newTokenHash,
-          expiresAt,
-          userId: oldToken.userId,
-        },
-      });
 
       return {
-        user: oldToken.user,
+        user: oldToken.session.user,
         newToken,
       };
     });

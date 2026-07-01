@@ -24,7 +24,8 @@ model User {
   updatedAt DateTime @updatedAt()
 
 
-  refreshTokens RefreshToken[]
+  
+  sessions Session[]
 
   @@map("users")
 }
@@ -37,7 +38,9 @@ enum UserRoles {
 
 model RefreshToken {
   id String @id @default(uuid()) @db.Uuid()
-  userId String @db.Uuid()
+  familyId String @db.Uuid()
+  parentId String? @db.Uuid()
+  sessionId String @db.Uuid()
 
   tokenHash String @unique
   expiresAt DateTime
@@ -46,7 +49,30 @@ model RefreshToken {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt()
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session Session? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  parent RefreshToken? @relation("RefreshTokenParent", fields: [parentId], references: [id])
+  children RefreshToken[] @relation("RefreshTokenParent")
 
+  @@index([familyId])
+  @@index([sessionId])
+  @@index([parentId])
   @@map("refresh_token")
+}
+
+model Session {
+  id String @id @default(uuid()) @db.Uuid()
+  userId String @db.Uuid()
+
+  userAgent String?
+  ipAddress String?
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt()
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokens RefreshToken[]
+
+  @@map("sessions")
 }

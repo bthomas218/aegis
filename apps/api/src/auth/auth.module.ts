@@ -12,6 +12,7 @@ import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './roles/roles.guard';
+import { SessionsModule } from 'src/sessions/sessions.module';
 
 const EXPIRY_MINUTES = 60;
 
@@ -33,6 +34,7 @@ const EXPIRY_MINUTES = 60;
       global: true,
     }),
     PassportModule,
+    SessionsModule,
   ],
   providers: [
     AuthService,
