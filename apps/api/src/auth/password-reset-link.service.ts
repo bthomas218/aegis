@@ -4,8 +4,10 @@ import { Injectable } from '@nestjs/common';
 export class PasswordResetLinkService {
   private readonly sentLinks = new Map<string, string>();
 
-  async send(email: string, token: string) {
+  send(email: string, token: string): Promise<void> {
     this.sentLinks.set(email, token);
+
+    return Promise.resolve();
   }
 
   getLastToken(email: string) {

@@ -379,7 +379,7 @@ describe('RefreshTokensService', () => {
         revokedAt: null,
       },
       data: {
-        revokedAt: expect.any(Date),
+        revokedAt: expect.any(Date) as Date,
       },
     });
     expect(txMock.session.updateMany).toHaveBeenCalledWith({
@@ -388,7 +388,7 @@ describe('RefreshTokensService', () => {
         revokedAt: null,
       },
       data: {
-        revokedAt: expect.any(Date),
+        revokedAt: expect.any(Date) as Date,
       },
     });
     expect(txMock.refreshToken.update).not.toHaveBeenCalled();
@@ -421,7 +421,7 @@ describe('RefreshTokensService', () => {
         revokedAt: null,
       },
       data: {
-        revokedAt: expect.any(Date),
+        revokedAt: expect.any(Date) as Date,
       },
     });
     expect(txMock.refreshToken.updateMany).toHaveBeenCalledWith({
@@ -430,7 +430,7 @@ describe('RefreshTokensService', () => {
         revokedAt: null,
       },
       data: {
-        revokedAt: expect.any(Date),
+        revokedAt: expect.any(Date) as Date,
       },
     });
   });

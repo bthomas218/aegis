@@ -10,7 +10,9 @@ export class ResetTokensService {
   async create(userId: string) {
     const token = tokenUtils.generateRandomToken();
     const tokenHash = tokenUtils.hashToken(token);
-    const expiresAt = this.getTokenExpiry();
+    const expiresAt = tokenUtils.getTokenExpiry({
+      minutes: RESET_TOKEN_EXPIRATION_MINUTES,
+    });
 
     await this.prisma.passwordResetToken.create({
       data: {
@@ -42,13 +44,5 @@ export class ResetTokensService {
         usedAt: new Date(),
       },
     });
-  }
-
-  private getTokenExpiry() {
-    const expiresAt = new Date();
-    expiresAt.setMinutes(
-      expiresAt.getMinutes() + RESET_TOKEN_EXPIRATION_MINUTES,
-    );
-    return expiresAt;
   }
 }

@@ -10,6 +10,7 @@ jest.mock('src/prisma/prisma.service', () => ({
 jest.mock('src/utils/token-utils', () => ({
   generateRandomToken: jest.fn(),
   hashToken: jest.fn(),
+  getTokenExpiry: jest.fn(),
 }));
 
 describe('ResetTokensService', () => {
@@ -56,6 +57,11 @@ describe('ResetTokensService', () => {
     (
       tokenUtils.hashToken as jest.MockedFunction<typeof tokenUtils.hashToken>
     ).mockReturnValue('hashed-token');
+    (
+      tokenUtils.getTokenExpiry as jest.MockedFunction<
+        typeof tokenUtils.getTokenExpiry
+      >
+    ).mockReturnValue(new Date('2026-07-01T00:00:00.000Z'));
     prismaServiceMock.passwordResetToken.create.mockResolvedValue({
       id: 'reset-token-1',
     });

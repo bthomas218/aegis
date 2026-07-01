@@ -38,13 +38,14 @@ class TestRateLimitGuard extends RateLimitGuard {
 }
 
 describe('RateLimitGuard', () => {
+  const incrementMock = jest.fn().mockResolvedValue({
+    totalHits: 1,
+    timeToExpire: 60_000,
+    isBlocked: false,
+    timeToBlockExpire: 0,
+  });
   const storageMock: ThrottlerStorage = {
-    increment: jest.fn().mockResolvedValue({
-      totalHits: 1,
-      timeToExpire: 60_000,
-      isBlocked: false,
-      timeToBlockExpire: 0,
-    }),
+    increment: incrementMock,
   };
   const prismaServiceMock: {
     refreshToken: {
@@ -104,7 +105,7 @@ describe('RateLimitGuard', () => {
         sessionId: true,
       },
     });
-    expect(storageMock.increment).toHaveBeenCalledWith(
+    expect(incrementMock).toHaveBeenCalledWith(
       'refreshSession:session-1',
       60_000,
       60,
@@ -122,7 +123,7 @@ describe('RateLimitGuard', () => {
     ).resolves.toBe(true);
 
     expect(prismaServiceMock.refreshToken.findUnique).not.toHaveBeenCalled();
-    expect(storageMock.increment).toHaveBeenCalledWith(
+    expect(incrementMock).toHaveBeenCalledWith(
       'refreshSession:127.0.0.1',
       60_000,
       60,

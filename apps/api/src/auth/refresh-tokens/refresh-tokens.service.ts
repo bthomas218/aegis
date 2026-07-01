@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import crypto from 'node:crypto';
 import { SessionsService } from 'src/sessions/sessions.service';
+import * as tokenUtils from 'src/utils/token-utils';
 
 const EXPIRY_DAYS = 7;
 
@@ -13,9 +14,9 @@ export class RefreshTokensService {
   ) {}
 
   async create(userId: string, userAgent?: string, ipAddress?: string) {
-    const token = this.generateToken();
-    const tokenHash = this.hashToken(token);
-    const expiresAt = this.getTokenExpiry();
+    const token = tokenUtils.generateRandomToken();
+    const tokenHash = tokenUtils.hashToken(token);
+    const expiresAt = tokenUtils.getTokenExpiry({ days: EXPIRY_DAYS });
     const familyId = crypto.randomUUID();
 
     await this.sessions.create({
@@ -34,7 +35,7 @@ export class RefreshTokensService {
   }
 
   async validate(token: string) {
-    const tokenHash = this.hashToken(token);
+    const tokenHash = tokenUtils.hashToken(token);
     const refreshToken = await this.prisma.refreshToken.findUnique({
       where: {
         tokenHash,
@@ -53,7 +54,7 @@ export class RefreshTokensService {
   }
 
   async revoke(token: string) {
-    const tokenHash = this.hashToken(token);
+    const tokenHash = tokenUtils.hashToken(token);
     await this.prisma.refreshToken.updateMany({
       where: {
         tokenHash,
@@ -78,7 +79,7 @@ export class RefreshTokensService {
   }
 
   async rotate(token: string) {
-    const tokenHash = this.hashToken(token);
+    const tokenHash = tokenUtils.hashToken(token);
 
     const result = await this.prisma.$transaction(async (tx) => {
       const oldToken = await tx.refreshToken.findUnique({
@@ -137,8 +138,8 @@ export class RefreshTokensService {
         throw new UnauthorizedException('Invalid Refresh Token');
       }
 
-      const newToken = this.generateToken();
-      const newTokenHash = this.hashToken(newToken);
+      const newToken = tokenUtils.generateRandomToken();
+      const newTokenHash = tokenUtils.hashToken(newToken);
 
       await tx.refreshToken.create({
         data: {
@@ -175,7 +176,7 @@ export class RefreshTokensService {
   }
 
   async logout(token: string) {
-    const tokenHash = this.hashToken(token);
+    const tokenHash = tokenUtils.hashToken(token);
     const now = new Date();
 
     await this.prisma.$transaction(async (tx) => {
@@ -210,19 +211,5 @@ export class RefreshTokensService {
         },
       });
     });
-  }
-
-  private hashToken(token: string) {
-    return crypto.createHash('sha256').update(token).digest('hex');
-  }
-
-  private generateToken() {
-    return crypto.randomBytes(32).toString('hex');
-  }
-
-  private getTokenExpiry() {
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + EXPIRY_DAYS);
-    return expiresAt;
   }
 }

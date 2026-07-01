@@ -411,7 +411,7 @@ describe('AuthService', () => {
         id: 'reset-token-1',
       },
       data: {
-        usedAt: expect.any(Date),
+        usedAt: expect.any(Date) as Date,
       },
     });
     expect(sessionsServiceMock.revokeAll).toHaveBeenCalledWith('user-7');
