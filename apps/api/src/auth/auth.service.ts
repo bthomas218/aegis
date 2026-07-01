@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { UsersService } from 'src/users/users.service';
 import * as argon2 from 'argon2';
@@ -51,7 +51,17 @@ export class AuthService {
   async validateUser(credentials: CredentialsDTO) {
     const { email, password } = credentials;
 
-    const user = await this.users.findByEmail(email);
+    let user: User | null;
+
+    try {
+      user = await this.users.findByEmail(email);
+    } catch (err) {
+      if (err instanceof NotFoundException) {
+        return null;
+      }
+
+      throw err;
+    }
 
     if (!user || !user.password_hash) {
       return null;

@@ -1,4 +1,5 @@
 import { JwtService } from '@nestjs/jwt';
+import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as argon2 from 'argon2';
 import type { User } from 'src/generated/prisma/client';
@@ -129,6 +130,20 @@ describe('AuthService', () => {
     usersServiceMock.findByEmail.mockResolvedValue(null);
 
     await expect(service.validateUser(credentials)).resolves.toBeNull();
+  });
+
+  it('returns null when user lookup throws NotFoundException during validation', async () => {
+    const credentials: CredentialsDTO = {
+      email: 'missing@example.com',
+      password: 'password123',
+    };
+
+    usersServiceMock.findByEmail.mockRejectedValue(
+      new NotFoundException('User Not Found'),
+    );
+
+    await expect(service.validateUser(credentials)).resolves.toBeNull();
+    expect(argon2.verify).not.toHaveBeenCalled();
   });
 
   it('returns null when validating credentials with an invalid password', async () => {
