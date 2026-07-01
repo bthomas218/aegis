@@ -7,10 +7,19 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 import {
   UserCreateInput,
+  UserSelect,
   UserUpdateInput,
   UserWhereInput,
 } from 'src/generated/prisma/models';
 import { ListUsersDTO } from './dto/list-users.dto';
+
+const publicUserSelect = {
+  id: true,
+  email: true,
+  role: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies UserSelect;
 
 @Injectable()
 export class UsersService {
@@ -20,6 +29,7 @@ export class UsersService {
     try {
       const user = await this.prisma.user.create({
         data: createUser,
+        select: publicUserSelect,
       });
       return user;
     } catch (err) {
@@ -51,6 +61,7 @@ export class UsersService {
       where: {
         id,
       },
+      select: publicUserSelect,
     });
 
     if (!user) {
@@ -65,9 +76,7 @@ export class UsersService {
 
     const where: UserWhereInput = {
       ...(role ? { role } : {}),
-      ...(search
-        ? { email: { contains: search, mode: 'insensitive' } }
-        : {}),
+      ...(search ? { email: { contains: search, mode: 'insensitive' } } : {}),
     };
 
     const [data, totalItems] = await this.prisma.$transaction(async (tx) => {
@@ -77,6 +86,7 @@ export class UsersService {
           skip,
           take: limit,
           orderBy: { createdAt: 'desc' },
+          select: publicUserSelect,
         }),
         await tx.user.count({ where }),
       ];
@@ -103,6 +113,7 @@ export class UsersService {
           id,
         },
         data: updateUser,
+        select: publicUserSelect,
       });
       return user;
     } catch (err) {
@@ -122,6 +133,7 @@ export class UsersService {
         where: {
           id,
         },
+        select: publicUserSelect,
       });
       return user;
     } catch (err) {

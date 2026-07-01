@@ -5,6 +5,7 @@ import type { User } from 'src/generated/prisma/client';
 import { UserRoles } from 'src/generated/prisma/enums';
 import type {
   UserCreateInput,
+  UserSelect,
   UserUpdateInput,
   UserWhereInput,
 } from 'src/generated/prisma/models';
@@ -27,6 +28,13 @@ describe('UsersService', () => {
     createdAt,
     updatedAt,
   };
+  const publicUserSelect = {
+    id: true,
+    email: true,
+    role: true,
+    createdAt: true,
+    updatedAt: true,
+  } satisfies UserSelect;
   const transactionMock = {
     user: {
       findMany: jest.fn<
@@ -37,6 +45,7 @@ describe('UsersService', () => {
             skip: number;
             take: number;
             orderBy: { createdAt: 'desc' };
+            select: UserSelect;
           },
         ]
       >(),
@@ -45,16 +54,23 @@ describe('UsersService', () => {
   };
   const prismaMock = {
     user: {
-      create: jest.fn<Promise<User>, [{ data: UserCreateInput }]>(),
+      create: jest.fn<
+        Promise<User>,
+        [{ data: UserCreateInput; select: UserSelect }]
+      >(),
       findUnique: jest.fn<
         Promise<User | null>,
-        [{ where: { email: string } } | { where: { id: string } }]
+        | [{ where: { email: string } }]
+        | [{ where: { id: string }; select: UserSelect }]
       >(),
       update: jest.fn<
         Promise<User>,
-        [{ where: { id: string }; data: UserUpdateInput }]
+        [{ where: { id: string }; data: UserUpdateInput; select: UserSelect }]
       >(),
-      delete: jest.fn<Promise<User>, [{ where: { id: string } }]>(),
+      delete: jest.fn<
+        Promise<User>,
+        [{ where: { id: string }; select: UserSelect }]
+      >(),
     },
     $transaction: jest.fn<
       Promise<[User[], number]>,
@@ -95,7 +111,10 @@ describe('UsersService', () => {
     prismaMock.user.create.mockResolvedValue(user);
 
     await expect(service.create(createUser)).resolves.toEqual(user);
-    expect(prismaMock.user.create).toHaveBeenCalledWith({ data: createUser });
+    expect(prismaMock.user.create).toHaveBeenCalledWith({
+      data: createUser,
+      select: publicUserSelect,
+    });
   });
 
   it('throws ConflictException when a duplicate user is created', async () => {
@@ -145,6 +164,7 @@ describe('UsersService', () => {
     await expect(service.findById(user.id)).resolves.toEqual(user);
     expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
       where: { id: user.id },
+      select: publicUserSelect,
     });
   });
 
@@ -189,6 +209,7 @@ describe('UsersService', () => {
       skip: 10,
       take: listUsersDto.limit,
       orderBy: { createdAt: 'desc' },
+      select: publicUserSelect,
     });
     expect(transactionMock.user.count).toHaveBeenCalledWith({ where });
   });
@@ -214,6 +235,7 @@ describe('UsersService', () => {
       skip: 0,
       take: listUsersDto.limit,
       orderBy: { createdAt: 'desc' },
+      select: publicUserSelect,
     });
     expect(transactionMock.user.count).toHaveBeenCalledWith({ where: {} });
   });
@@ -237,6 +259,7 @@ describe('UsersService', () => {
     expect(prismaMock.user.update).toHaveBeenCalledWith({
       where: { id: user.id },
       data: updateUser,
+      select: publicUserSelect,
     });
   });
 
@@ -262,6 +285,7 @@ describe('UsersService', () => {
     await expect(service.delete(user.id)).resolves.toEqual(user);
     expect(prismaMock.user.delete).toHaveBeenCalledWith({
       where: { id: user.id },
+      select: publicUserSelect,
     });
   });
 

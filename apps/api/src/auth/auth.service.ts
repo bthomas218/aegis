@@ -67,7 +67,7 @@ export class AuthService {
     await this.refreshTokens.revoke(refreshToken);
   }
 
-  async issueAccessToken(user: User) {
+  async issueAccessToken(user: Omit<User, 'password_hash'>) {
     const { id, email, role } = user;
     const payload: JwtPayload = {
       sub: `aegis|${id}`,
