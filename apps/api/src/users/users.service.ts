@@ -117,11 +117,15 @@ export class UsersService {
       });
       return user;
     } catch (err) {
-      if (
-        err instanceof PrismaClientKnownRequestError &&
-        err.code === 'P2025'
-      ) {
-        throw new NotFoundException('User Not Found');
+      if (err instanceof PrismaClientKnownRequestError) {
+        switch (err.code) {
+          case 'P2025':
+            throw new NotFoundException('User Not Found');
+          case 'P2002':
+            throw new ConflictException('User already exists');
+          default:
+            throw err;
+        }
       }
       throw err;
     }

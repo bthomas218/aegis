@@ -255,6 +255,7 @@ Response: `200 OK`
 #### `POST /admin/users`
 
 Requires `SYSTEM_ADMIN`.
+Returns `409 Conflict` when the email is already in use.
 
 Request:
 
@@ -281,6 +282,7 @@ Response: `201 Created`
 #### `PATCH /admin/users/:id`
 
 Requires `SYSTEM_ADMIN`.
+Returns `409 Conflict` when the request attempts to change the user to an email that is already in use.
 
 Request:
 

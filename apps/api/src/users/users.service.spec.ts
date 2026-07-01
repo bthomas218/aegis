@@ -279,6 +279,28 @@ describe('UsersService', () => {
     );
   });
 
+  it('throws ConflictException when updating to an email that already exists', async () => {
+    const updateUser: UserUpdateInput = {
+      email: 'existing@example.com',
+    };
+    const prismaError = new PrismaClientKnownRequestError(
+      'Unique constraint failed',
+      {
+        code: 'P2002',
+        clientVersion: 'test-client',
+      },
+    );
+
+    prismaMock.user.update.mockRejectedValue(prismaError);
+
+    await expect(service.update(user.id, updateUser)).rejects.toThrow(
+      ConflictException,
+    );
+    await expect(service.update(user.id, updateUser)).rejects.toThrow(
+      'User already exists',
+    );
+  });
+
   it('deletes a user and returns it', async () => {
     prismaMock.user.delete.mockResolvedValue(user);
 
