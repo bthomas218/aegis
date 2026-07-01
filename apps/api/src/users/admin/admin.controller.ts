@@ -8,6 +8,7 @@ import {
   Body,
   Patch,
   Delete,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { UsersService } from '../users.service';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
@@ -25,7 +26,7 @@ export class AdminController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRoles.ADMIN, UserRoles.SYSTEM_ADMIN)
   @Get(':id')
-  async find(@Param('id') id: string) {
+  async find(@Param('id', ParseUUIDPipe) id: string) {
     return await this.users.findById(id);
   }
 
@@ -46,14 +47,17 @@ export class AdminController {
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRoles.SYSTEM_ADMIN)
-  async update(@Param('id') id: string, @Body() updateUser: UpdateUserDTO) {
+  async update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateUser: UpdateUserDTO,
+  ) {
     return await this.users.update(id, updateUser);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRoles.SYSTEM_ADMIN)
   @Delete(':id')
-  async delete(@Param('id') id: string) {
+  async delete(@Param('id', ParseUUIDPipe) id: string) {
     return await this.users.delete(id);
   }
 }

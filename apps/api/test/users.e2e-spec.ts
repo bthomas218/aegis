@@ -17,7 +17,7 @@ jest.mock('../src/prisma/prisma.service', () => ({
 describe('UsersModule (e2e)', () => {
   const jwtSecret = 'test-jwt-secret';
   const user: User = {
-    id: 'user-1',
+    id: '11111111-1111-4111-8111-111111111111',
     email: 'test@example.com',
     password_hash: 'hashed-password',
     role: UserRoles.USER,
@@ -26,13 +26,13 @@ describe('UsersModule (e2e)', () => {
   };
   const admin: User = {
     ...user,
-    id: 'admin-1',
+    id: '22222222-2222-4222-8222-222222222222',
     email: 'admin@example.com',
     role: UserRoles.ADMIN,
   };
   const systemAdmin: User = {
     ...user,
-    id: 'system-admin-1',
+    id: '33333333-3333-4333-8333-333333333333',
     email: 'system-admin@example.com',
     role: UserRoles.SYSTEM_ADMIN,
   };
@@ -207,7 +207,7 @@ describe('UsersModule (e2e)', () => {
     };
     const createdUser: User = {
       ...user,
-      id: 'user-2',
+      id: '44444444-4444-4444-8444-444444444444',
       email: createUser.email,
       password_hash: createUser.password_hash,
       role: createUser.role,
