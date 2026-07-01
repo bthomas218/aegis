@@ -4,6 +4,7 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -45,5 +46,20 @@ export class AuthController {
   @Post('logout')
   async logout(@Body() refresh: RefreshDTO) {
     await this.auth.logout(refresh.refreshToken);
+  }
+
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Post('forgot-password')
+  async forgotPassword(@Query('email') email: string) {
+    // TODO: Implement forgot password functionality
+  }
+
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Post('reset-password')
+  async resetPassword(
+    @Query('token') token: string,
+    @Body() body: { newPassword: string },
+  ) {
+    // TODO: Implement reset password functionality
   }
 }

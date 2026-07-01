@@ -89,6 +89,14 @@ export class AuthService {
     await this.refreshTokens.logout(refreshToken);
   }
 
+  async forgotPassword(email: string) {
+    //TODO: Implement forgot password functionality
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    //TODO: Implement reset password functionality
+  }
+
   async issueAccessToken(user: Omit<User, 'password_hash'>) {
     const { id, email, role } = user;
     const payload: JwtPayload = {

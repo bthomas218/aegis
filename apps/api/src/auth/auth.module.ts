@@ -13,6 +13,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './roles/roles.guard';
 import { SessionsModule } from 'src/sessions/sessions.module';
+import { ResetTokensService } from './reset-tokens/reset-tokens.service';
 
 const EXPIRY_MINUTES = 60;
 
@@ -45,6 +46,7 @@ const EXPIRY_MINUTES = 60;
     JwtStrategy,
     JwtAuthGuard,
     RolesGuard,
+    ResetTokensService,
   ],
   controllers: [AuthController],
   exports: [JwtAuthGuard, RolesGuard],
