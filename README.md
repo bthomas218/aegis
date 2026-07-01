@@ -72,7 +72,20 @@ The API expects:
 pnpm --filter api exec prisma migrate dev
 ```
 
-5. Start the API:
+5. Seed local development users:
+
+```bash
+pnpm --filter api db:seed
+```
+
+The seed creates or updates these development-only login users:
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Admin | `admin@aegis.local` | `Admin123!` |
+| Super admin | `super-admin@aegis.local` | `SuperAdmin123!` |
+
+6. Start the API:
 
 ```bash
 pnpm --filter api dev
