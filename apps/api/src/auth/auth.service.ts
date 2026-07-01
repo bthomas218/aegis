@@ -14,6 +14,8 @@ import { JwtPayload } from './types/jwt-payload.type';
 import { ResetTokensService } from './reset-tokens/reset-tokens.service';
 import { SessionsService } from 'src/sessions/sessions.service';
 import { PasswordResetLinkService } from './password-reset-link.service';
+import { ERROR_MESSAGES } from 'src/common/constants/error-messages.constants';
+import { JWT_CONFIG } from './auth.constants';
 
 @Injectable()
 export class AuthService {
@@ -127,7 +129,9 @@ export class AuthService {
       resetToken.usedAt !== null ||
       resetToken.expiresAt <= new Date()
     ) {
-      throw new BadRequestException('Invalid password reset token');
+      throw new BadRequestException(
+        ERROR_MESSAGES.INVALID_PASSWORD_RESET_TOKEN,
+      );
     }
 
     const password_hash = await argon2.hash(newPassword);
@@ -158,7 +162,7 @@ export class AuthService {
   async issueAccessToken(user: Omit<User, 'password_hash'>) {
     const { id, email, role } = user;
     const payload: JwtPayload = {
-      sub: `aegis|${id}`,
+      sub: `${JWT_CONFIG.SUBJECT_PREFIX}${id}`,
       email,
       role,
     };

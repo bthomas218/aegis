@@ -1,20 +1,21 @@
 import { Type } from 'class-transformer';
 import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { LIST_USERS_DEFAULTS } from 'src/common/constants/pagination.constants';
 import { UserRoles } from 'src/generated/prisma/enums';
 
 export class ListUsersDTO {
   @Type(() => Number)
   @IsInt()
-  @Min(1)
+  @Min(LIST_USERS_DEFAULTS.MIN_LIMIT)
   @IsOptional()
-  page = 1;
+  page = LIST_USERS_DEFAULTS.PAGE;
 
   @Type(() => Number)
   @IsInt()
-  @Min(1)
-  @Max(100)
+  @Min(LIST_USERS_DEFAULTS.MIN_LIMIT)
+  @Max(LIST_USERS_DEFAULTS.MAX_LIMIT)
   @IsOptional()
-  limit = 10;
+  limit = LIST_USERS_DEFAULTS.LIMIT;
 
   @IsString()
   @IsOptional()

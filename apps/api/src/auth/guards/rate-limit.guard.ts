@@ -8,8 +8,11 @@ import {
   type ThrottlerRequest,
   type ThrottlerStorage,
 } from '@nestjs/throttler';
-import crypto from 'node:crypto';
+import { UNKNOWN_TRACKER } from 'src/common/constants/http.constants';
+import { THROTTLE_NAMES } from 'src/common/constants/throttle.constants';
+import { TOKEN_CONFIG } from 'src/common/constants/token.constants';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { hashToken } from 'src/utils/token-utils';
 
 @Injectable()
 export class RateLimitGuard extends ThrottlerGuard {
@@ -27,7 +30,7 @@ export class RateLimitGuard extends ThrottlerGuard {
   protected async handleRequest(
     requestProps: ThrottlerRequest,
   ): Promise<boolean> {
-    if (requestProps.throttler.name === 'refreshSession') {
+    if (requestProps.throttler.name === THROTTLE_NAMES.REFRESH_SESSION) {
       return super.handleRequest({
         ...requestProps,
         getTracker: (req) => this.getRefreshSessionTracker(req),
@@ -44,10 +47,7 @@ export class RateLimitGuard extends ThrottlerGuard {
       return this.getIpTracker(req);
     }
 
-    const tokenHash = crypto
-      .createHash('sha256')
-      .update(body.refreshToken)
-      .digest('hex');
+    const tokenHash = hashToken(body.refreshToken);
 
     const refreshToken = await this.prisma.refreshToken.findUnique({
       where: {
@@ -58,7 +58,9 @@ export class RateLimitGuard extends ThrottlerGuard {
       },
     });
 
-    return refreshToken?.sessionId ?? `token:${tokenHash}`;
+    return (
+      refreshToken?.sessionId ?? `${TOKEN_CONFIG.TRACKER_PREFIX}${tokenHash}`
+    );
   }
 
   private getIpTracker(req: Record<string, unknown>) {
@@ -69,7 +71,7 @@ export class RateLimitGuard extends ThrottlerGuard {
       'remoteAddress' in req.socket &&
       typeof req.socket.remoteAddress === 'string'
         ? req.socket.remoteAddress
-        : 'unknown')
+        : UNKNOWN_TRACKER)
     );
   }
 }

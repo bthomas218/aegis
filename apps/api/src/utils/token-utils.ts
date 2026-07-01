@@ -1,12 +1,18 @@
 import crypto from 'node:crypto';
+import { TOKEN_CONFIG } from 'src/common/constants/token.constants';
 
 export function hashToken(token: string): string {
-  const hash = crypto.createHash('sha256').update(token).digest('hex');
+  const hash = crypto
+    .createHash(TOKEN_CONFIG.HASH_ALGORITHM)
+    .update(token)
+    .digest(TOKEN_CONFIG.ENCODING);
   return hash;
 }
 
-export function generateRandomToken(length: number = 32): string {
-  return crypto.randomBytes(length).toString('hex');
+export function generateRandomToken(
+  length: number = TOKEN_CONFIG.DEFAULT_RANDOM_BYTES,
+): string {
+  return crypto.randomBytes(length).toString(TOKEN_CONFIG.ENCODING);
 }
 
 export function getTokenExpiry({

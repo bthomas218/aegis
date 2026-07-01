@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import * as tokenUtils from 'src/utils/token-utils';
+import { RESET_TOKEN_EXPIRATION_MINUTES } from '../auth.constants';
 
-const RESET_TOKEN_EXPIRATION_MINUTES = 15;
 @Injectable()
 export class ResetTokensService {
   constructor(private readonly prisma: PrismaService) {}

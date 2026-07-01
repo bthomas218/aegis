@@ -3,8 +3,8 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import crypto from 'node:crypto';
 import { SessionsService } from 'src/sessions/sessions.service';
 import * as tokenUtils from 'src/utils/token-utils';
-
-const EXPIRY_DAYS = 7;
+import { ERROR_MESSAGES } from 'src/common/constants/error-messages.constants';
+import { REFRESH_TOKEN_EXPIRY_DAYS } from '../auth.constants';
 
 @Injectable()
 export class RefreshTokensService {
@@ -16,7 +16,9 @@ export class RefreshTokensService {
   async create(userId: string, userAgent?: string, ipAddress?: string) {
     const token = tokenUtils.generateRandomToken();
     const tokenHash = tokenUtils.hashToken(token);
-    const expiresAt = tokenUtils.getTokenExpiry({ days: EXPIRY_DAYS });
+    const expiresAt = tokenUtils.getTokenExpiry({
+      days: REFRESH_TOKEN_EXPIRY_DAYS,
+    });
     const familyId = crypto.randomUUID();
 
     await this.sessions.create({
@@ -47,7 +49,7 @@ export class RefreshTokensService {
       refreshToken.revokedAt !== null ||
       refreshToken.expiresAt <= new Date()
     ) {
-      throw new UnauthorizedException('Invalid Refresh Token');
+      throw new UnauthorizedException(ERROR_MESSAGES.INVALID_REFRESH_TOKEN);
     }
 
     return refreshToken;
@@ -96,7 +98,7 @@ export class RefreshTokensService {
       });
 
       if (!oldToken) {
-        throw new UnauthorizedException('Invalid Refresh Token');
+        throw new UnauthorizedException(ERROR_MESSAGES.INVALID_REFRESH_TOKEN);
       }
 
       if (
@@ -104,7 +106,7 @@ export class RefreshTokensService {
         oldToken.session.revokedAt ||
         oldToken.session.expiresAt <= new Date()
       ) {
-        throw new UnauthorizedException('Invalid Refresh Token');
+        throw new UnauthorizedException(ERROR_MESSAGES.INVALID_REFRESH_TOKEN);
       }
 
       if (oldToken.revokedAt !== null) {
@@ -135,7 +137,7 @@ export class RefreshTokensService {
       }
 
       if (oldToken.expiresAt <= new Date()) {
-        throw new UnauthorizedException('Invalid Refresh Token');
+        throw new UnauthorizedException(ERROR_MESSAGES.INVALID_REFRESH_TOKEN);
       }
 
       const newToken = tokenUtils.generateRandomToken();
@@ -166,7 +168,9 @@ export class RefreshTokensService {
     });
 
     if (result.reuseDetected) {
-      throw new UnauthorizedException('Refresh Token Reuse Detected');
+      throw new UnauthorizedException(
+        ERROR_MESSAGES.REFRESH_TOKEN_REUSE_DETECTED,
+      );
     }
 
     return {

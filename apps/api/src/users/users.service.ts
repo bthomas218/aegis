@@ -7,19 +7,14 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 import {
   UserCreateInput,
-  UserSelect,
   UserUpdateInput,
   UserWhereInput,
 } from 'src/generated/prisma/models';
 import { ListUsersDTO } from './dto/list-users.dto';
-
-const publicUserSelect = {
-  id: true,
-  email: true,
-  role: true,
-  createdAt: true,
-  updatedAt: true,
-} satisfies UserSelect;
+import { ERROR_MESSAGES } from 'src/common/constants/error-messages.constants';
+import { PRISMA_QUERY } from 'src/common/constants/database-query.constants';
+import { PRISMA_ERROR_CODES } from 'src/common/constants/error-codes.constants';
+import { PUBLIC_USER_SELECT } from './users.constants';
 
 @Injectable()
 export class UsersService {
@@ -29,15 +24,15 @@ export class UsersService {
     try {
       const user = await this.prisma.user.create({
         data: createUser,
-        select: publicUserSelect,
+        select: PUBLIC_USER_SELECT,
       });
       return user;
     } catch (err) {
       if (
         err instanceof PrismaClientKnownRequestError &&
-        err.code === 'P2002'
+        err.code === PRISMA_ERROR_CODES.UNIQUE_CONSTRAINT_FAILED
       ) {
-        throw new ConflictException('User already exists');
+        throw new ConflictException(ERROR_MESSAGES.USER_ALREADY_EXISTS);
       }
       throw err;
     }
@@ -51,7 +46,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('User Not Found');
+      throw new NotFoundException(ERROR_MESSAGES.USER_NOT_FOUND);
     }
     return user;
   }
@@ -61,11 +56,11 @@ export class UsersService {
       where: {
         id,
       },
-      select: publicUserSelect,
+      select: PUBLIC_USER_SELECT,
     });
 
     if (!user) {
-      throw new NotFoundException('User Not Found');
+      throw new NotFoundException(ERROR_MESSAGES.USER_NOT_FOUND);
     }
     return user;
   }
@@ -76,7 +71,9 @@ export class UsersService {
 
     const where: UserWhereInput = {
       ...(role ? { role } : {}),
-      ...(search ? { email: { contains: search, mode: 'insensitive' } } : {}),
+      ...(search
+        ? { email: { contains: search, mode: PRISMA_QUERY.INSENSITIVE } }
+        : {}),
     };
 
     const [data, totalItems] = await this.prisma.$transaction(async (tx) => {
@@ -85,8 +82,8 @@ export class UsersService {
           where,
           skip,
           take: limit,
-          orderBy: { createdAt: 'desc' },
-          select: publicUserSelect,
+          orderBy: { [PRISMA_QUERY.CREATED_AT_FIELD]: PRISMA_QUERY.DESC },
+          select: PUBLIC_USER_SELECT,
         }),
         await tx.user.count({ where }),
       ];
@@ -113,16 +110,16 @@ export class UsersService {
           id,
         },
         data: updateUser,
-        select: publicUserSelect,
+        select: PUBLIC_USER_SELECT,
       });
       return user;
     } catch (err) {
       if (err instanceof PrismaClientKnownRequestError) {
         switch (err.code) {
-          case 'P2025':
-            throw new NotFoundException('User Not Found');
-          case 'P2002':
-            throw new ConflictException('User already exists');
+          case PRISMA_ERROR_CODES.RECORD_NOT_FOUND:
+            throw new NotFoundException(ERROR_MESSAGES.USER_NOT_FOUND);
+          case PRISMA_ERROR_CODES.UNIQUE_CONSTRAINT_FAILED:
+            throw new ConflictException(ERROR_MESSAGES.USER_ALREADY_EXISTS);
           default:
             throw err;
         }
@@ -137,15 +134,15 @@ export class UsersService {
         where: {
           id,
         },
-        select: publicUserSelect,
+        select: PUBLIC_USER_SELECT,
       });
       return user;
     } catch (err) {
       if (
         err instanceof PrismaClientKnownRequestError &&
-        err.code === 'P2025'
+        err.code === PRISMA_ERROR_CODES.RECORD_NOT_FOUND
       ) {
-        throw new NotFoundException('User Not Found');
+        throw new NotFoundException(ERROR_MESSAGES.USER_NOT_FOUND);
       }
       throw err;
     }

@@ -1,4 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { ERROR_MESSAGES } from 'src/common/constants/error-messages.constants';
+import { PRISMA_QUERY } from 'src/common/constants/database-query.constants';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateSessionDTO } from './dto/create-session.dto';
 
@@ -33,7 +35,7 @@ export class SessionsService {
     });
 
     if (!session) {
-      throw new NotFoundException('Session Not Found');
+      throw new NotFoundException(ERROR_MESSAGES.SESSION_NOT_FOUND);
     }
     return session;
   }
@@ -48,7 +50,7 @@ export class SessionsService {
         },
       },
       orderBy: {
-        createdAt: 'desc',
+        [PRISMA_QUERY.CREATED_AT_FIELD]: PRISMA_QUERY.DESC,
       },
     });
 
@@ -67,7 +69,7 @@ export class SessionsService {
     });
 
     if (result.count === 0) {
-      throw new NotFoundException('Session Not Found');
+      throw new NotFoundException(ERROR_MESSAGES.SESSION_NOT_FOUND);
     }
   }
 

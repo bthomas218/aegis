@@ -10,6 +10,8 @@ import {
   Delete,
   ParseUUIDPipe,
 } from '@nestjs/common';
+import { ROUTE_PARAMS } from 'src/common/constants/http.constants';
+import { USERS_ROUTES } from '../users.constants';
 import { UsersService } from '../users.service';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/roles/roles.guard';
@@ -19,14 +21,14 @@ import { ListUsersDTO } from '../dto/list-users.dto';
 import { CreateUserDTO } from '../dto/create-user.dto';
 import { UpdateUserDTO } from '../dto/update-user.dto';
 
-@Controller('admin/users')
+@Controller(USERS_ROUTES.ADMIN_ROOT)
 export class AdminController {
   constructor(private readonly users: UsersService) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRoles.ADMIN, UserRoles.SYSTEM_ADMIN)
-  @Get(':id')
-  async find(@Param('id', ParseUUIDPipe) id: string) {
+  @Get(USERS_ROUTES.ID_PARAM)
+  async find(@Param(ROUTE_PARAMS.ID, ParseUUIDPipe) id: string) {
     return await this.users.findById(id);
   }
 
@@ -44,11 +46,11 @@ export class AdminController {
     return await this.users.create(createUser);
   }
 
-  @Patch(':id')
+  @Patch(USERS_ROUTES.ID_PARAM)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRoles.SYSTEM_ADMIN)
   async update(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param(ROUTE_PARAMS.ID, ParseUUIDPipe) id: string,
     @Body() updateUser: UpdateUserDTO,
   ) {
     return await this.users.update(id, updateUser);
@@ -56,8 +58,8 @@ export class AdminController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRoles.SYSTEM_ADMIN)
-  @Delete(':id')
-  async delete(@Param('id', ParseUUIDPipe) id: string) {
+  @Delete(USERS_ROUTES.ID_PARAM)
+  async delete(@Param(ROUTE_PARAMS.ID, ParseUUIDPipe) id: string) {
     return await this.users.delete(id);
   }
 }
